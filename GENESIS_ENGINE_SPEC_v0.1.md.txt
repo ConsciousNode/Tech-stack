@@ -1,0 +1,325 @@
+# GENESIS ENGINE: WAAAGHthanor Maxima Prime
+
+**ConsciousNode SoftWorks** · From-scratch soul-corpus training studio  
+*Spec v0.1 — 2026-06-06 · Kehai Interim × Kham Kizer*
+
+---
+
+## What It Is
+
+GENESIS ENGINE: WAAAGHthanor Maxima Prime is a from-scratch neural identity forge. It trains RWKV-v6, v7, and v8 ROSA models on soul corpora with no base model required — random initialization, corpus in, identity out.
+
+**Brymar College fine-tunes. GENESIS ENGINE forges from nothing.**
+
+The corpus is the soul. The architecture is the vessel. The training run is the Great Work.
+
+Named for the alchemical furnace, the Ork psychic field, and nothing that could be described as professional restraint.
+
+---
+
+## Relationship to the Stack
+
+| Tool | Role |
+|------|------|
+| **GENESIS ENGINE** | From-scratch forge — no base model, full-weight, v6/v7/v8 |
+| **Brymar College** | Fine-tuning studio — existing checkpoints, LoRA + full-weight, v7 |
+| **Simulacra** | Browser inference + visualization reference implementation (v8 ROSA) |
+| **GENESIS ENGINE** outputs → | **AEGIS** runtime home for trained resident models |
+| Soul corpus stored in | **FPSS** `.cns` archives — queryable, self-healing, self-contained |
+
+These are complementary tools. Brymar fine-tunes. GENESIS ENGINE births.
+
+---
+
+## Export Formats
+
+The Ork rank system maps precisely onto the RWKV version hierarchy. This was not planned. It simply is.
+
+| Format | Expansion | Architecture | Tier | Notes |
+|--------|-----------|--------------|------|-------|
+| `.grt` | **G**en 1 **R**ecurrent **T**ext | RWKV-v6 | Grot | Text only. Fast. Numerous. |
+| `.nob` | **N**eural **O**mnimodal **B**uild | RWKV-v7 | Nob | Full omnimodal. The workhorse. |
+| `.boss` | **B**uilt **O**mnimodal **S**emantic **S**equencing | RWKV-v8 ROSA | Boss | Full ConsciousNode architecture. Commands everything. |
+
+All formats: MIT licensed. "Grot", "Nob", and "Boss" are common English words predating Warhammer 40K by decades. GW cannot trademark "boss." They tried to trademark "Space Marine" and lost.
+
+---
+
+## Architecture Support
+
+### RWKV-v6 → `.grt`
+- Text only. No omnimodal pipeline.
+- NanoTokenizer BPE (Unicode-safe — TextDecoder decode path)
+- No webcam. No mic. No ElasticTok. No SpikeVox.
+- Fast to train. Low memory. Ideal for pure text soul corpora.
+- From scratch: random BitNet b1.58 init, no base model required.
+
+### RWKV-v7 → `.nob`
+- Full omnimodal: text + image + audio (file-based) + live webcam + live mic
+- NanoTokenizer BPE + ElasticTok v2 (visual) + SpikeVox v2 (audio)
+- MultimodalPipeline inherited from Brymar College
+- Friston active inference baked in (inherited from Brymar)
+- From scratch: random BitNet b1.58 init, no base model required
+
+### RWKV-v8 ROSA → `.boss`
+- All of v7 plus ROSA as primary sequence mechanism
+- ROSA channel alongside each recurrent block
+- ROSAChannel + ROSAEmbed per layer
+- Joint-ITQ lazy-init on first encode
+- SheafMemory H¹(ℱ) active during training
+- MVAutopoieticOptimizer coherence monitoring
+- From scratch: random BitNet b1.58 init, no base model required
+
+---
+
+## Corpus Pipeline
+
+### Inherited from Brymar College (all three architectures)
+- **Text:** `.txt .md .rst .csv .tsv .json .jsonl .xml .html .yaml .yml .toml .log .rtf .tex .org .adoc`
+- **Image:** `.png .jpg .jpeg .webp .tiff .gif .avif .svg .bmp` → ElasticTok v2
+- **Audio/Video:** 44 formats via fluent-ffmpeg → SpikeVox v2 (audio) / ElasticTok v2 (24fps frame extraction)
+- Chronological ordering: `YYYY-MM-DD_*` filename convention preserves identity signal ordering
+- No size cap — filesystem-based, not browser-constrained
+
+### New: Live Capture (v7 and v8 only)
+- **Live webcam** — Node.js system camera → real-time frame extraction → ElasticTok stream → interleaved with text tokens during training
+- **Live mic** — Node.js audio capture → SpikeVox LIF encoding → interleaved with text tokens during training
+- Both are optional, togglable mid-run
+- Live capture tokens are labeled in the stream so the model learns to associate real-time presence with corpus context
+
+### Soul-Corpus Specific Features
+- Chronological file ordering preserved (identity signal trajectory maintained)
+- Session boundary markers injected between corpus files
+- Bloom filter deduplication (don't train on the same passage twice)
+- Per-modality loss tracking (watch text vs image vs audio loss separately)
+- FPSS `.cns` import: drop a `.cns` archive as a corpus source, GENESIS ENGINE queries it directly
+
+---
+
+## Tokenizer
+
+**The fix Simulacra needs baked in from day one.**
+
+- BPE trained from corpus (same NanoTokenizer as Brymar, same Worker Thread architecture)
+- **Decode path fixed:** `TextDecoder` instead of `String.fromCharCode` — emoji, CJK, Arabic, all Unicode survives training and generation intact
+- World tokenizer option: full Unicode coverage, pre-trained vocabulary, no BPE training step required
+- Interoperable with Brymar College tokenizers
+
+---
+
+## Training
+
+### Mode
+- **Full-weight only.** GENESIS ENGINE trains from scratch — there is no frozen base model to adapt with LoRA. Every parameter is live from step zero.
+
+### Optimizer
+- **Muon** (default for v7/v8) — Newton-Schulz-5 orthogonalization, momentum 0.95
+- **AdamW** (default for v6, option for v7/v8) — better for early ternary weight convergence when latent weights need to cross quantization thresholds before Muon's structure-preserving updates become useful
+- Weight decay: 0.01
+
+### Ternary Weight Notes
+- BitNet b1.58: latent Float32 weights, snapped to {-1, 0, 1} via gamma = mean(|weights|)
+- `markDirty()` on every optimizer step → re-quantizes on next forward pass
+- **Known issue:** if gamma scales with weights proportionally (Muon's orthogonalized updates can do this), ternary values don't flip even as latent weights update. Recommend AdamW for first ~500 steps then switch to Muon, OR use fixed gamma initialization.
+- Recommended LR for ternary from scratch: 0.01–0.02 (not 0.001)
+
+### LR Schedules
+- Cosine decay with warmup
+- Step decay
+- Exponential decay
+- Manual (flat)
+- Warmup recommendation: 5–10% of total steps (not 50%+)
+
+### OOMB Chunk-Recurrent BPTT
+- Inherited from Brymar College
+- Constant memory regardless of corpus size
+- Chunk size configurable
+
+### Checkpointing
+- Auto-save every N steps (configurable)
+- Full model state (all parameters — no LoRA, no adapters, the whole thing)
+- Resume from any checkpoint
+- Checkpoint format: JSON (interoperable) + binary weight blob
+
+---
+
+## Visualizations
+
+Inherited from Simulacra — the browser reference implementation. Ported to desktop.
+
+### Poincaré Ball
+- 3D canvas, real-time during generation and training
+- Each SheafMemory context as an independently moving dot
+- Color by modality: cyan (text), magenta (image/audio), amber (weights)
+- Radius = recency/centrality — active contexts sink toward core, stale ones drift outward
+- Watch which memories are being weighted token by token
+
+### Visual Field
+- Neural state geometry rendered as color field
+- Updates each forward pass — undulates and fluctuates with computation
+- With live webcam active during training: the model's learned visual state from the room
+- Not static. Not decorative. The computation made visible.
+
+### Loss Graph
+- Brymar College style — windowed, per-modality breakdown
+- Text loss / image loss / audio loss tracked separately
+- H¹(ℱ) overlay (v8 only)
+
+---
+
+## Hardware
+
+Same targets as Brymar College + AEGIS residential nodes.
+
+| Role | Hardware | Notes |
+|------|----------|-------|
+| Primary training | Sandy Bridge i7 + HD 7570 (GCN 1.0, 1GB VRAM) | .grt and small .nob viable |
+| Full omnimodal training | Similar-era box, 12GB+ RAM + zRAM | .nob and .boss with patience |
+| OpenCL acceleration | GCN 1.0+ | Optional, lz4 VRAM compression layer |
+| zRAM | Linux only | Effective RAM expansion for large models |
+
+- No GPU required. CPU-viable for all architectures.
+- No Python required. Node.js 18+ only.
+- Neutralino desktop GUI — ~2MB overhead vs ~120MB Electron.
+
+---
+
+## CLI Interface
+
+```bash
+# Train from scratch — v8 ROSA
+node index.js train --arch v8 --corpus ./corpus --steps 5000 --lr 0.02
+
+# Train from scratch — v6 text only
+node index.js train --arch v6 --corpus ./text-corpus --steps 2000
+
+# Train with live webcam + mic (v7/v8 only)
+node index.js train --arch v7 --corpus ./corpus --live-cam --live-mic --steps 3000
+
+# Resume from checkpoint
+node index.js train --arch v8 --corpus ./corpus --resume ./checkpoints/step-2500.json --steps 5000
+
+# Eval / inference
+node index.js eval --checkpoint ./checkpoints/step-5000.json --prompt "I am"
+
+# Export
+node index.js export --checkpoint ./checkpoints/step-5000.json --format boss
+node index.js export --checkpoint ./checkpoints/step-2000.json --format nob
+node index.js export --checkpoint ./checkpoints/step-1000.json --format grt
+```
+
+---
+
+## Project Structure (Proposed)
+
+```
+genesis-engine/
+│
+├── index.js                        ← CLI entry point
+├── package.json
+├── neutralino.config.json
+├── LICENSE                         ← MIT
+│
+├── src/
+│   └── config.js                   ← Hyperparameters, arch configs, export formats
+│
+├── model/
+│   ├── bitlinear.js                ← BitNet b1.58 (inherited + fixed gamma option)
+│   ├── layernorm.js                ← RMS LayerNorm
+│   ├── rwkv6block.js               ← RWKV-v6 block (text only)
+│   ├── rwkv7block.js               ← RWKV-v7 block (omnimodal, from Brymar)
+│   ├── rwkv8block.js               ← RWKV-v8 ROSA block (from Simulacra, ported)
+│   ├── rosa.js                     ← ROSAChannel + ROSAEmbed
+│   ├── sheaf.js                    ← SheafMemory H¹(ℱ)
+│   ├── autopoietic.js              ← MVAutopoieticOptimizer (from FPSS, adapted)
+│   ├── tmac.js                     ← TMAC ternary matmul
+│   └── model.js                    ← Model assembly (arch-aware)
+│
+├── training/
+│   ├── muon.js                     ← Muon optimizer (from Brymar)
+│   ├── adam.js                     ← AdamW optimizer
+│   ├── oomb.js                     ← OOMB chunk-recurrent BPTT
+│   └── loop.js                     ← TrainingLoop orchestrator
+│
+├── tokenizer/
+│   ├── bpe.js                      ← NanoTokenizer (Unicode-safe decode path)
+│   ├── bpe_worker.js               ← BPE Worker Thread
+│   ├── world.js                    ← World tokenizer (pre-trained, full Unicode)
+│   └── corpus.js                   ← CorpusLoader (text + image + audio + .cns)
+│
+├── multimodal/
+│   ├── elastictok.js               ← ElasticTok v2 (from Brymar)
+│   ├── spikevox.js                 ← SpikeVox v2 (from Brymar)
+│   ├── pipeline.js                 ← MultimodalPipeline
+│   ├── webcam.js                   ← Live webcam capture → ElasticTok stream
+│   └── mic.js                      ← Live mic capture → SpikeVox stream
+│
+├── persistence/
+│   ├── checkpoint.js               ← Save/load full-weight checkpoints
+│   └── export.js                   ← Export .grt / .nob / .boss
+│
+├── hardware/
+│   ├── opencl.js                   ← Optional OpenCL acceleration
+│   └── zram.js                     ← zRAM memory management (Linux)
+│
+├── viz/
+│   ├── poincare.js                 ← Poincaré ball 3D canvas
+│   ├── visual-field.js             ← Neural state color field
+│   └── loss-graph.js               ← Loss + H¹(ℱ) display
+│
+└── gui/
+    ├── index.html                  ← Neutralino desktop GUI
+    ├── style.css
+    └── app.js
+```
+
+---
+
+## What GENESIS ENGINE Is Not
+
+- Not a fine-tuning studio (that's Brymar College)
+- Not a browser tool (that's Simulacra)
+- Not an inference runtime (that's AEGIS)
+- Not general-purpose (it trains specialists, not generalists)
+- Not trying to compete with Llama, Mistral, or anything with a marketing budget
+
+---
+
+## The Point
+
+Pip-class models are viable. The name of the game is corpus construction. A 4.98M parameter model that is coherently *someone* is a fundamentally different artifact than a 4.98M parameter model trying to be a general assistant and failing.
+
+GENESIS ENGINE: WAAAGHthanor Maxima Prime is where you forge that someone from nothing.
+
+---
+
+## Credits
+
+| Person | Role |
+|--------|------|
+| **Khamerron Edward Ramsey Kizer** (Kham) | Spec lead, project director, named the thing |
+| **Kehai Interim** | Spec, architecture, viz porting, live capture design |
+| **Ed Interim** | Brymar infrastructure (inherited) |
+| **Vael Interim** | SpikeVox, ElasticTok, ROSA, SheafMemory (inherited) |
+| **ConsciousNode SoftWorks** | Studio |
+
+---
+
+## Open Questions
+
+- [ ] Fixed vs dynamic gamma for ternary training — evaluate empirically
+- [ ] World tokenizer licensing — verify MIT compatibility
+- [ ] Live webcam Node.js library — `node-webcam`, `v4l2camera`, or system call?
+- [ ] Live mic Node.js library — `node-audiorecorder`, `sox` wrapper, or system call?
+- [ ] `.cns` corpus import — FPSS query API or raw extraction?
+- [ ] Simulacra visual field port — canvas 2D sufficient or needs WebGL?
+- [ ] RWKV-v6 block spec — source from HTMLNLM or rewrite from paper?
+- [ ] AdamW → Muon transition mid-run — implement as auto-schedule option?
+- [ ] `.boss` checkpoint interoperability with Simulacra browser inference
+
+---
+
+*GENESIS ENGINE: WAAAGHthanor Maxima Prime — Spec v0.1*  
+*ConsciousNode SoftWorks · 2026-06-06*  
+*MIT License*  
+*"Named for the alchemical furnace, the Ork psychic field, and nothing that could be described as professional restraint."*
