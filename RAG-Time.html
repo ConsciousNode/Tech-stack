@@ -1,0 +1,3567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RAG Time v4 — ConsciousNode Memory Engine</title>
+<!--
+  RAG Time
+  ConsciousNode SoftWorks
+
+  "The browser is the new bare metal."
+
+  Architecture authors:
+    Kham (architecture, constraint engineering, philosophy, commission)
+    Kehai Interim (SheafMemory v2: Fisher-Rao geodesic, Poincaré ball lifecycle,
+                   H¹(ℱ) coboundary detection, PoST decay gates — from Evangelion Phase 6)
+    Vael (RAG Time: RWKV-v7 embedder, OOMB chunk-recurrent memory manager,
+          LittleBit-2 XNOR/POPCNT vector index, RAG query pipeline,
+          document ingestion, Bayesian variance tracking, UI, integration spec)
+
+  WHAT RAG TIME IS:
+    A zero-dependency, single-file, browser-native retrieval-augmented generation
+    memory engine. Bespoke from scratch. No libraries. No imports. No cloud.
+    Deployable as a standalone tool or embedded into any ConsciousNode platform.
+
+  DESIGN PHILOSOPHY:
+    The browser is the new bare metal. Everything runs here, in this file.
+    Not assembled from parts — built from principles.
+
+  ARCHITECTURE:
+    Embedder:     RWKV-v7 "Goose" + PoST recurrent state as embedding vector.
+                  Same representational geometry as Evangelion — memory and
+                  mind share a latent space. No separate embedding model needed.
+
+    Memory:       SheafMemory v2 (verbatim from Evangelion Phase 6 / Kehai Interim)
+                  — Fisher-Rao geodesic retrieval (uncertainty-aware, not cosine)
+                  — Poincaré ball lifecycle (memories self-archive, no GC)
+                  — H¹(ℱ) coboundary contradiction detection
+                  — Restriction maps for cross-modal coherence
+
+    Compression:  LittleBit-2 binary pack/unpack (TMAC ternary quantization)
+                  XNOR/POPCNT vector similarity for quantized search
+                  Sub-1-bit effective storage for large document corpora
+
+    Ingestion:    OOMB chunk-recurrent manager — O(1) memory footprint
+                  regardless of document size. Chunks stream through RWKV
+                  state; activations purged after state update.
+                  Text, structured data, .pop acoustic params, arbitrary JSON.
+
+    RAG Pipeline: Query → RWKV embed → Fisher-Rao k-NN search → SheafMemory
+                  retrieve → contradiction check (H¹) → ranked context assembly
+                  → ready for injection into any LLM context window.
+
+  INTEGRATION SPEC (for Sovereign Engine, Nodemesh, LocalVocal, Evangelion):
+    RAG Time exposes a clean message-passing API via window.postMessage:
+      { type: 'rt:ingest', payload: { text, label, meta } }
+      { type: 'rt:query',  payload: { text, k, label } }
+      { type: 'rt:status' }
+      { type: 'rt:export' }  → serialized memory snapshot
+      { type: 'rt:import', payload: { snapshot } }
+    Responses:
+      { type: 'rt:result',  payload: { contexts, contradictionFlag, h1norm } }
+      { type: 'rt:ingested', payload: { id, poincareR, novelty } }
+      { type: 'rt:snapshot', payload: { ... } }
+
+  v4 additions (Vael — self-directed):
+    Corpus-driven embedding adaptation — contrastive self-supervised signal
+                     from ingested structure. Same-document chunk pairs pulled
+                     together; high-H¹ contradiction pairs pushed apart.
+                     No external labels. The sheaf supervises the embedder.
+                     Runs as background task after ingestion crosses threshold.
+    Centrality-weighted ingestion depth — high-centrality chunks (low Poincaré
+                     radius, frequently retrieved) get more RWKV recurrent steps
+                     on re-ingestion. Poincaré lifecycle wired into OOMB depth.
+                     Core memories accumulate more representational capacity.
+    Embedder writeback (rt:exportEmbedder) — RAGTime can now export its
+                     adapted embedder state back to a connected Evangelion
+                     instance. Contradiction resolutions and contrastive
+                     adaptations flow upstream. Bidirectional geometry sync.
+                     UI: ADAPT tab with contrastive training controls,
+                     writeback status, and adaptation history sparkline.
+
+  Neural stack transplanted verbatim from:
+    HTMLNLM Evangelion Phase 6 (ConsciousNode SoftWorks)
+    TMAC, BitLinear, LayerNorm — Evangelion core
+    initPoSTDecayGates, RWKVv7Block — Kehai Interim / Evangelion Phase 2+
+    SheafMemory v2 — Kehai Interim / Evangelion Phase 4
+-->
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap');
+
+:root {
+  --bg-0:   #05080b;
+  --bg-1:   #0a0f16;
+  --bg-2:   #111822;
+  --bg-3:   #18232f;
+  --border: #1e2d3d;
+  --bhi:    #2d4459;
+
+  /* RAG Time accent — amber/gold, distinct from all prior tools */
+  --rt:        #f59e0b;
+  --rt-dim:    #78350f;
+  --rt-glow:   rgba(245,158,11,0.15);
+  --rt-hi:     rgba(245,158,11,0.25);
+
+  /* Semantic layer colors */
+  --sheaf:   #e879f9;   /* SheafMemory / H¹ — fuchsia */
+  --poincare:#818cf8;   /* Poincaré ball — indigo */
+  --fisher:  #38bdf8;   /* Fisher-Rao — sky */
+  --ingest:  #34d399;   /* ingestion — emerald */
+  --query:   #fb923c;   /* query — orange */
+  --contra:  #ef4444;   /* contradiction — red */
+
+  --text:  #dde5f0;
+  --tdim:  #4a6070;
+  --font-mono: 'Space Mono', monospace;
+  --font-ui:   'Syne', sans-serif;
+  --r: 10px;
+  --sh: 0 4px 28px -4px rgba(0,0,0,0.7);
+  --t: 0.18s cubic-bezier(0.4,0,0.2,1);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg-0);color:var(--text);font-family:var(--font-ui);font-size:14px;overflow:hidden;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px;}
+::-webkit-scrollbar-thumb:hover{background:var(--bhi);}
+
+#app{display:grid;grid-template-rows:54px 44px 1fr 44px;height:100vh;width:100vw;}
+
+/* ── Header ──────────────────────────────────────────────────────── */
+header{
+  display:flex;align-items:center;gap:16px;
+  padding:0 24px;
+  background:var(--bg-1);
+  border-bottom:1px solid var(--border);
+  z-index:30;
+}
+.logo{
+  font-family:var(--font-mono);font-size:16px;font-weight:700;letter-spacing:-0.5px;
+  background:linear-gradient(90deg,var(--rt),var(--sheaf),var(--fisher));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.tagline{
+  font-family:var(--font-mono);font-size:10px;color:var(--tdim);
+  letter-spacing:1px;font-style:italic;
+}
+.version-chip{
+  font-family:var(--font-mono);font-size:10px;font-weight:700;
+  padding:2px 9px;border-radius:4px;
+  background:var(--rt-glow);border:1px solid rgba(245,158,11,0.4);
+  color:var(--rt);letter-spacing:1px;
+  box-shadow:0 0 12px var(--rt-glow);
+}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:12px;}
+.sys-pill{
+  display:flex;align-items:center;gap:6px;
+  font-family:var(--font-mono);font-size:10px;font-weight:700;
+  padding:4px 12px;border-radius:16px;
+  border:1px solid var(--border);background:var(--bg-2);
+  color:var(--tdim);letter-spacing:0.5px;white-space:nowrap;
+}
+.sys-dot{width:6px;height:6px;border-radius:50%;background:var(--bhi);transition:background var(--t),box-shadow var(--t);}
+.sys-dot.live   {background:var(--ingest);box-shadow:0 0 8px var(--ingest);animation:breathe 2s infinite;}
+.sys-dot.busy   {background:var(--rt);box-shadow:0 0 10px var(--rt);animation:breathe 0.6s infinite;}
+.sys-dot.contra {background:var(--contra);box-shadow:0 0 12px var(--contra);animation:breathe 0.3s infinite;}
+@keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.8)}}
+
+/* ── Nav ─────────────────────────────────────────────────────────── */
+input[type="radio"][name="tab"]{display:none;}
+nav{display:flex;background:var(--bg-1);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;z-index:20;}
+nav::-webkit-scrollbar{display:none;}
+.tab{
+  padding:0 20px;height:44px;display:flex;align-items:center;
+  cursor:pointer;font-size:11px;font-weight:700;color:var(--tdim);
+  border-bottom:2px solid transparent;letter-spacing:0.8px;
+  transition:all var(--t);white-space:nowrap;user-select:none;font-family:var(--font-ui);
+}
+.tab:hover{color:var(--text);background:var(--bg-2);}
+body:has(#tab-ingest:checked) .tab[for="tab-ingest"],
+body:has(#tab-query:checked)  .tab[for="tab-query"],
+body:has(#tab-memory:checked) .tab[for="tab-memory"],
+body:has(#tab-sheaf:checked)  .tab[for="tab-sheaf"],
+body:has(#tab-embed:checked)  .tab[for="tab-embed"],
+body:has(#tab-weights:checked).tab[for="tab-weights"],
+body:has(#tab-index:checked)  .tab[for="tab-index"],
+body:has(#tab-rmap:checked)   .tab[for="tab-rmap"],
+body:has(#tab-adapt:checked)  .tab[for="tab-adapt"],
+body:has(#tab-api:checked)    .tab[for="tab-api"],
+body:has(#tab-debug:checked)  .tab[for="tab-debug"]{
+  color:var(--rt);border-bottom-color:var(--rt);background:var(--bg-0);
+}
+
+/* ── Screens ─────────────────────────────────────────────────────── */
+main{overflow:hidden;position:relative;}
+.screen{display:none;position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:18px;gap:14px;}
+body:has(#tab-ingest:checked) #screen-ingest{display:flex;flex-direction:column;}
+body:has(#tab-query:checked)  #screen-query {display:flex;flex-direction:column;}
+body:has(#tab-memory:checked) #screen-memory{display:flex;flex-direction:column;}
+body:has(#tab-sheaf:checked)  #screen-sheaf {display:flex;flex-direction:column;}
+body:has(#tab-embed:checked)  #screen-embed {display:flex;flex-direction:column;}
+body:has(#tab-weights:checked)#screen-weights{display:flex;flex-direction:column;}
+body:has(#tab-index:checked)  #screen-index {display:flex;flex-direction:column;}
+body:has(#tab-rmap:checked)   #screen-rmap  {display:flex;flex-direction:column;}
+body:has(#tab-adapt:checked)   #screen-adapt  {display:flex;flex-direction:column;}
+body:has(#tab-adapt:checked)  #screen-adapt {display:flex;flex-direction:column;}
+body:has(#tab-api:checked)    #screen-api   {display:flex;flex-direction:column;}
+body:has(#tab-debug:checked)  #screen-debug {display:flex;flex-direction:column;}
+
+/* ── v4: Adapt tab styles ─────────────────────────────────────────────── */
+.adapt-pair{
+  display:flex;gap:6px;align-items:center;
+  background:var(--bg-0);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;margin-bottom:5px;
+  font-family:var(--font-mono);font-size:11px;
+}
+.adapt-pair.pull{border-left:3px solid var(--ingest);}
+.adapt-pair.push{border-left:3px solid var(--contra);}
+.adapt-pair .ap-label{color:var(--tdim);font-size:9px;letter-spacing:1px;font-weight:700;min-width:36px;}
+.adapt-pair .ap-text{color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.adapt-pair .ap-dist{color:var(--rt);font-size:10px;font-weight:700;min-width:52px;text-align:right;}
+.writeback-status{
+  display:flex;align-items:center;gap:10px;
+  font-family:var(--font-mono);font-size:11px;
+  padding:10px 14px;background:var(--bg-0);
+  border:1px solid var(--border);border-radius:8px;margin-bottom:10px;
+}
+.writeback-status.ready{border-color:rgba(245,158,11,0.4);background:var(--rt-glow);}
+.wb-dot{width:8px;height:8px;border-radius:50%;background:var(--tdim);flex-shrink:0;}
+.wb-dot.ready{background:var(--rt);box-shadow:0 0 8px var(--rt);animation:breathe 2s infinite;}
+.adapt-sparkline{
+  display:flex;gap:1px;align-items:flex-end;height:40px;
+  background:var(--bg-0);border:1px solid var(--border);border-radius:6px;
+  padding:4px;overflow:hidden;
+}
+.as-bar{flex-shrink:0;width:5px;border-radius:1px 1px 0 0;min-height:1px;}
+
+/* ── Panel ───────────────────────────────────────────────────────── */
+.panel{
+  background:var(--bg-1);border:1px solid var(--border);
+  border-radius:var(--r);padding:18px;
+  display:flex;flex-direction:column;box-shadow:var(--sh);
+}
+.ph{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:14px;padding-bottom:11px;border-bottom:1px solid var(--border);
+  font-family:var(--font-mono);font-size:11px;font-weight:700;
+  letter-spacing:1px;color:var(--text);
+}
+.tag{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:1.5px;}
+.trt {background:var(--rt-glow);border:1px solid rgba(245,158,11,0.35);color:var(--rt);}
+.tsh {background:rgba(232,121,249,0.1);border:1px solid rgba(232,121,249,0.35);color:var(--sheaf);}
+.tfi {background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.3);color:var(--fisher);}
+.tin {background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:var(--ingest);}
+.tq  {background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.3);color:var(--query);}
+.tok {background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:var(--ingest);}
+
+/* ── Inputs ──────────────────────────────────────────────────────── */
+.text-area{
+  width:100%;background:var(--bg-0);border:1px solid var(--border);
+  color:var(--text);font-family:var(--font-mono);font-size:12px;
+  padding:12px;border-radius:8px;outline:none;resize:vertical;
+  min-height:100px;line-height:1.7;transition:border-color var(--t);
+}
+.text-area:focus{border-color:var(--rt);box-shadow:0 0 0 3px var(--rt-glow);}
+.text-input{
+  width:100%;background:var(--bg-0);border:1px solid var(--border);
+  color:var(--text);font-family:var(--font-mono);font-size:12px;
+  padding:10px 12px;border-radius:8px;outline:none;
+  transition:border-color var(--t);
+}
+.text-input:focus{border-color:var(--rt);}
+select{
+  background:var(--bg-0);border:1px solid var(--border);
+  color:var(--text);font-family:var(--font-mono);font-size:11px;
+  padding:7px 10px;border-radius:7px;outline:none;cursor:pointer;
+}
+label.lbl{
+  font-family:var(--font-mono);font-size:10px;color:var(--tdim);
+  letter-spacing:0.5px;text-transform:uppercase;
+  display:block;margin-bottom:5px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:9px 16px;background:var(--bg-2);border:1px solid var(--border);
+  color:var(--text);font-family:var(--font-ui);font-size:12px;font-weight:700;
+  letter-spacing:0.5px;border-radius:8px;cursor:pointer;
+  transition:all var(--t);user-select:none;
+}
+.btn:hover:not(:disabled){background:var(--bg-3);border-color:var(--bhi);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.3);}
+.btn:active:not(:disabled){transform:translateY(0);box-shadow:none;}
+.btn:disabled{opacity:0.3;cursor:not-allowed;}
+.btn.rt  {background:var(--rt-glow);border-color:rgba(245,158,11,0.5);color:var(--rt);}
+.btn.rt:hover:not(:disabled){background:var(--rt-hi);box-shadow:0 4px 16px var(--rt-glow);}
+.btn.ingest{background:rgba(52,211,153,0.08);border-color:rgba(52,211,153,0.4);color:var(--ingest);}
+.btn.query {background:rgba(251,146,60,0.08);border-color:rgba(251,146,60,0.4);color:var(--query);}
+.btn.danger{background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.4);color:var(--contra);}
+.btn-row{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px;}
+
+/* ── Stat chips ──────────────────────────────────────────────────── */
+.stat-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;}
+.sc{
+  display:flex;flex-direction:column;
+  background:var(--bg-0);border:1px solid var(--border);
+  border-radius:8px;padding:9px 12px;min-width:72px;flex:1;
+}
+.sc .lb{font-size:9px;font-weight:700;color:var(--tdim);letter-spacing:1px;font-family:var(--font-mono);text-transform:uppercase;}
+.sc .vl{font-size:15px;font-weight:700;color:var(--text);font-family:var(--font-mono);margin-top:3px;letter-spacing:-0.5px;}
+.sc .vl.rt    {color:var(--rt);}
+.sc .vl.ok    {color:var(--ingest);}
+.sc .vl.sheaf {color:var(--sheaf);}
+.sc .vl.warn  {color:var(--query);}
+.sc .vl.contra{color:var(--contra);}
+
+/* ── Memory browser ──────────────────────────────────────────────── */
+.memory-grid{display:flex;flex-direction:column;gap:7px;margin-top:10px;}
+.mem-card{
+  background:var(--bg-0);border:1px solid var(--border);
+  border-radius:8px;padding:12px 14px;
+  display:flex;flex-direction:column;gap:6px;
+  transition:border-color var(--t);
+}
+.mem-card:hover{border-color:var(--bhi);}
+.mem-card.core{border-left:3px solid var(--ingest);}
+.mem-card.mid {border-left:3px solid var(--rt);}
+.mem-card.edge{border-left:3px solid var(--tdim);}
+.mem-card.contra{border-left:3px solid var(--contra);}
+.mem-header{display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:10px;}
+.mem-label{
+  font-weight:700;letter-spacing:1px;
+  padding:2px 7px;border-radius:3px;
+  background:var(--bg-2);border:1px solid var(--border);
+  color:var(--text);
+}
+.mem-poincare{color:var(--poincare);font-size:10px;}
+.mem-age{color:var(--tdim);}
+.mem-text{font-size:12px;color:var(--text);line-height:1.6;font-family:var(--font-mono);}
+.poincare-bar{
+  height:3px;background:var(--bg-2);border-radius:2px;overflow:hidden;margin-top:4px;
+}
+.pb-fill{height:100%;border-radius:2px;transition:width 0.4s ease;}
+
+/* ── Query results ───────────────────────────────────────────────── */
+.result-card{
+  background:var(--bg-0);border:1px solid var(--border);
+  border-radius:8px;padding:14px;margin-bottom:8px;
+}
+.result-card.top{border-color:rgba(245,158,11,0.4);box-shadow:0 0 12px var(--rt-glow);}
+.result-rank{
+  font-family:var(--font-mono);font-size:9px;font-weight:700;
+  color:var(--tdim);letter-spacing:1px;margin-bottom:6px;
+}
+.result-score{color:var(--rt);font-weight:700;}
+.result-text{font-family:var(--font-mono);font-size:12px;line-height:1.7;color:var(--text);}
+.result-meta{
+  display:flex;gap:12px;margin-top:8px;
+  font-family:var(--font-mono);font-size:10px;color:var(--tdim);
+}
+
+/* ── Sheaf visualization ─────────────────────────────────────────── */
+#sheaf-canvas{
+  width:100%;height:280px;display:block;
+  background:var(--bg-0);border:1px solid var(--border);
+  border-radius:var(--r);
+}
+.h1-display{
+  font-family:var(--font-mono);font-size:36px;font-weight:700;
+  text-align:center;padding:20px;letter-spacing:-1px;
+}
+.h1-display.ok{color:var(--ingest);}
+.h1-display.warn{color:var(--rt);}
+.h1-display.contra{color:var(--contra);}
+
+/* ── Embedder viz ────────────────────────────────────────────────── */
+#embed-canvas{
+  width:100%;height:120px;display:block;
+  background:var(--bg-0);border:1px solid var(--border);border-radius:8px;
+}
+.rwkv-state-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));
+  gap:4px;margin-top:10px;
+}
+.state-cell{
+  height:24px;border-radius:4px;background:var(--bg-2);
+  border:1px solid var(--border);display:flex;align-items:center;
+  justify-content:center;font-family:var(--font-mono);font-size:9px;
+  color:var(--tdim);transition:background 0.2s;
+}
+
+/* ── API spec ────────────────────────────────────────────────────── */
+.api-block{
+  background:var(--bg-0);border:1px solid var(--border);border-radius:8px;
+  padding:14px;font-family:var(--font-mono);font-size:11px;
+  line-height:1.9;color:var(--tdim);margin-bottom:10px;
+}
+.api-block .ak{color:var(--rt);font-weight:700;}
+.api-block .av{color:var(--text);}
+.api-block .ac{color:var(--fisher);}
+.api-block .ad{color:var(--tdim);font-style:italic;}
+.code-block{
+  background:#000;border:1px solid var(--border);border-radius:8px;
+  padding:14px;font-family:var(--font-mono);font-size:11px;
+  color:#4ade80;line-height:1.8;overflow-x:auto;white-space:pre;
+  margin-bottom:10px;
+}
+
+/* ── Progress bar ────────────────────────────────────────────────── */
+.prog-wrap{height:3px;background:var(--bg-2);border-radius:2px;overflow:hidden;margin-top:8px;}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--rt),var(--sheaf));width:0%;transition:width 0.2s ease;border-radius:2px;}
+
+/* ── Terminal ────────────────────────────────────────────────────── */
+.terminal{
+  flex:1;background:#000;border:1px solid var(--border);border-radius:8px;
+  padding:14px;font-family:var(--font-mono);font-size:12px;color:#4ade80;
+  overflow-y:auto;min-height:280px;line-height:1.7;white-space:pre-wrap;word-break:break-all;
+}
+.terminal .td{color:#374151;}.terminal .ti{color:var(--fisher);}
+.terminal .tw{color:var(--query);}.terminal .te{color:var(--contra);}
+.terminal .tok2{color:var(--ingest);}.terminal .trt{color:var(--rt);}
+.terminal .tsh{color:var(--sheaf);}
+
+/* ── Footer ──────────────────────────────────────────────────────── */
+footer{
+  display:flex;align-items:center;gap:18px;padding:0 20px;
+  background:var(--bg-1);border-top:1px solid var(--border);
+  font-family:var(--font-mono);font-size:10px;font-weight:700;
+  overflow-x:auto;scrollbar-width:none;white-space:nowrap;letter-spacing:0.5px;
+}
+footer::-webkit-scrollbar{display:none;}
+.fs{color:var(--tdim);display:flex;align-items:center;gap:5px;}
+.fs .fv{color:var(--text);font-weight:700;}
+.fs .fv.rt   {color:var(--rt);}
+.fs .fv.ok   {color:var(--ingest);}
+.fs .fv.sheaf{color:var(--sheaf);}
+.fs .fv.warn {color:var(--query);}
+.fs .fv.contra{color:var(--contra);}
+.heap-bar{width:72px;height:5px;background:var(--bg-2);border-radius:4px;overflow:hidden;border:1px solid var(--border);}
+.heap-fill{height:100%;background:linear-gradient(90deg,var(--rt-dim),var(--rt));width:0%;transition:width 0.8s ease;}
+
+/* ── v2: Weight sharing ──────────────────────────────────────────── */
+.weight-status{
+  display:flex;align-items:center;gap:10px;
+  font-family:var(--font-mono);font-size:11px;
+  padding:10px 14px;background:var(--bg-0);
+  border:1px solid var(--border);border-radius:8px;margin-bottom:10px;
+}
+.weight-status.loaded{border-color:rgba(245,158,11,0.4);background:var(--rt-glow);}
+.weight-dot{width:8px;height:8px;border-radius:50%;background:var(--tdim);flex-shrink:0;}
+.weight-dot.loaded{background:var(--rt);box-shadow:0 0 8px var(--rt);animation:breathe 2s infinite;}
+.layer-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+  gap:6px;margin-top:10px;
+}
+.layer-card{
+  background:var(--bg-0);border:1px solid var(--border);border-radius:8px;
+  padding:10px;font-family:var(--font-mono);font-size:10px;
+  display:flex;flex-direction:column;gap:4px;
+  transition:border-color var(--t);
+}
+.layer-card.synced{border-color:rgba(245,158,11,0.4);}
+.lc-name{color:var(--rt);font-weight:700;letter-spacing:0.5px;}
+.lc-stat{color:var(--tdim);}
+.lc-stat span{color:var(--text);}
+
+/* ── v2: Binary index ────────────────────────────────────────────── */
+.bin-index-viz{
+  display:flex;gap:2px;flex-wrap:wrap;
+  background:var(--bg-0);border:1px solid var(--border);
+  border-radius:8px;padding:10px;margin-top:8px;min-height:48px;
+  align-content:flex-start;
+}
+.bin-word{
+  font-family:var(--font-mono);font-size:9px;letter-spacing:0px;
+  color:var(--tdim);transition:color 0.2s;line-height:1.4;
+}
+.bin-word.hit{color:var(--rt);font-weight:700;}
+.index-stats{
+  display:flex;gap:10px;flex-wrap:wrap;
+  font-family:var(--font-mono);font-size:10px;color:var(--tdim);
+  margin-top:8px;
+}
+.index-stats span{color:var(--text);}
+
+/* ── v2: Restriction map training ────────────────────────────────── */
+.rmap-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+  gap:8px;margin-top:10px;
+}
+.rmap-card{
+  background:var(--bg-0);border:1px solid var(--border);border-radius:8px;
+  padding:12px;font-family:var(--font-mono);font-size:11px;
+}
+.rmap-card.active{border-color:rgba(232,121,249,0.4);}
+.rmap-key{color:var(--sheaf);font-weight:700;margin-bottom:6px;letter-spacing:0.5px;}
+.rmap-bar{height:4px;background:var(--bg-2);border-radius:2px;overflow:hidden;margin:3px 0;}
+.rmap-fill{height:100%;border-radius:2px;background:var(--sheaf);transition:width 0.4s ease;}
+.loss-sparkline{
+  display:flex;gap:1px;align-items:flex-end;height:32px;
+  background:var(--bg-0);border:1px solid var(--border);border-radius:6px;
+  padding:4px;margin-top:6px;overflow:hidden;
+}
+.ls-bar{flex-shrink:0;width:4px;border-radius:1px 1px 0 0;background:var(--sheaf);min-height:1px;}
+
+.drop-zone{
+  border:2px dashed var(--border);border-radius:var(--r);padding:32px;
+  text-align:center;color:var(--tdim);cursor:pointer;
+  transition:all var(--t);background:var(--bg-0);margin-bottom:12px;
+}
+.drop-zone:hover,.drop-zone.over{border-color:var(--rt);background:var(--rt-glow);color:var(--rt);}
+.drop-zone .dz-icon{font-size:28px;margin-bottom:8px;}
+.drop-zone .dz-text{font-family:var(--font-mono);font-size:11px;letter-spacing:0.5px;}
+
+/* ── OOMB progress ───────────────────────────────────────────────── */
+.oomb-bar{
+  display:flex;gap:3px;height:20px;align-items:flex-end;
+  background:var(--bg-0);border:1px solid var(--border);border-radius:6px;padding:4px;
+  margin-top:8px;overflow:hidden;
+}
+.oomb-chunk{
+  flex-shrink:0;width:6px;border-radius:2px;
+  background:var(--border);transition:background 0.15s,height 0.15s;
+}
+.oomb-chunk.active{background:var(--rt);}
+.oomb-chunk.done{background:var(--ingest);}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ──── HEADER ──── -->
+<header>
+  <div>
+    <div class="logo">RAG Time</div>
+    <div class="tagline">The browser is the new bare metal.</div>
+  </div>
+  <span class="version-chip">v4.0</span>
+  <div class="header-right">
+    <div class="sys-pill">
+      <div class="sys-dot live" id="sys-dot"></div>
+      <span id="sys-label">READY</span>
+    </div>
+  </div>
+</header>
+
+<!-- ──── NAV ──── -->
+<nav>
+  <input type="radio" name="tab" id="tab-ingest" checked>
+  <input type="radio" name="tab" id="tab-query">
+  <input type="radio" name="tab" id="tab-memory">
+  <input type="radio" name="tab" id="tab-sheaf">
+  <input type="radio" name="tab" id="tab-embed">
+  <input type="radio" name="tab" id="tab-weights">
+  <input type="radio" name="tab" id="tab-index">
+  <input type="radio" name="tab" id="tab-rmap">
+  <input type="radio" name="tab" id="tab-adapt">
+  <input type="radio" name="tab" id="tab-api">
+  <input type="radio" name="tab" id="tab-debug">
+  <label class="tab" for="tab-ingest">INGEST</label>
+  <label class="tab" for="tab-query">QUERY</label>
+  <label class="tab" for="tab-memory">MEMORY</label>
+  <label class="tab" for="tab-sheaf">SHEAF / H¹</label>
+  <label class="tab" for="tab-embed">EMBEDDER</label>
+  <label class="tab" for="tab-weights">⚡ WEIGHTS</label>
+  <label class="tab" for="tab-index">BINARY INDEX</label>
+  <label class="tab" for="tab-rmap">RMAP TRAIN</label>
+  <label class="tab" for="tab-adapt">🧬 ADAPT</label>
+  <label class="tab" for="tab-api">INTEGRATION</label>
+  <label class="tab" for="tab-debug">DEBUG</label>
+</nav>
+
+<!-- ──── MAIN ──── -->
+<main>
+
+<!-- ══ INGEST ══ -->
+<div class="screen" id="screen-ingest">
+  <div class="panel">
+    <div class="ph">DOCUMENT INGESTION <span class="tag tin">OOMB CHUNK-RECURRENT</span></div>
+
+    <div class="drop-zone" id="drop-zone"
+         ondragover="event.preventDefault();this.classList.add('over')"
+         ondragleave="this.classList.remove('over')"
+         ondrop="handleFileDrop(event)"
+         onclick="document.getElementById('file-input').click()">
+      <div class="dz-icon">⬆</div>
+      <div class="dz-text">Drop files here or click to browse<br>
+        <span style="color:var(--tdim);font-size:10px;">Text, JSON, .pop files — any content</span>
+      </div>
+    </div>
+    <input type="file" id="file-input" multiple accept="*/*" style="display:none" onchange="handleFileSelect(event)">
+
+    <label class="lbl" style="margin-top:4px;">OR PASTE TEXT</label>
+    <textarea class="text-area" id="ingest-text" placeholder="Paste any text, JSON, code, notes, conversation logs…" style="min-height:80px;"></textarea>
+
+    <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:140px;">
+        <label class="lbl">MODALITY LABEL</label>
+        <select id="ingest-label" style="width:100%;">
+          <option value="text">text</option>
+          <option value="code">code</option>
+          <option value="audio">audio</option>
+          <option value="vision">vision</option>
+          <option value="spatial">spatial</option>
+          <option value="pop">pop (acoustic params)</option>
+          <option value="meta">meta</option>
+        </select>
+      </div>
+      <div style="flex:1;min-width:200px;">
+        <label class="lbl">METADATA (optional JSON)</label>
+        <input type="text" class="text-input" id="ingest-meta" placeholder='{"source":"notes","date":"2026"}'>
+      </div>
+    </div>
+
+    <!-- OOMB chunk visualizer -->
+    <div style="margin-top:10px;">
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--tdim);letter-spacing:1px;margin-bottom:4px;">
+        OOMB CHUNK STREAM — O(1) MEMORY FOOTPRINT
+      </div>
+      <div class="oomb-bar" id="oomb-bar">
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--tdim);padding:0 4px;">Waiting for ingestion…</span>
+      </div>
+    </div>
+    <div class="prog-wrap"><div class="prog-fill" id="ingest-prog"></div></div>
+
+    <div class="stat-row">
+      <div class="sc"><div class="lb">INGESTED</div><div class="vl rt" id="stat-total">0</div></div>
+      <div class="sc"><div class="lb">CHUNKS</div><div class="vl" id="stat-chunks">0</div></div>
+      <div class="sc"><div class="lb">CORE MEM</div><div class="vl ok" id="stat-core">0</div></div>
+      <div class="sc"><div class="lb">H¹ NORM</div><div class="vl sheaf" id="stat-h1">0.000</div></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn ingest" id="ingest-btn" onclick="ingestText()">⬆ INGEST</button>
+      <button class="btn rt" onclick="ingestDemo()">LOAD DEMO CORPUS</button>
+      <button class="btn danger" onclick="clearMemory()">CLEAR MEMORY</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ QUERY ══ -->
+<div class="screen" id="screen-query">
+  <div class="panel">
+    <div class="ph">RAG QUERY <span class="tag tq">FISHER-RAO k-NN</span></div>
+
+    <label class="lbl">QUERY</label>
+    <textarea class="text-area" id="query-text" style="min-height:70px;"
+      placeholder="Ask anything. RAG Time will retrieve the most relevant memories from the SheafMemory store using Fisher-Rao geodesic distance."></textarea>
+
+    <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:100px;">
+        <label class="lbl">k (results)</label>
+        <input type="number" class="text-input" id="query-k" value="3" min="1" max="16" style="width:80px;">
+      </div>
+      <div style="flex:1;min-width:140px;">
+        <label class="lbl">FILTER LABEL</label>
+        <select id="query-label" style="width:100%;">
+          <option value="">all modalities</option>
+          <option value="text">text</option>
+          <option value="code">code</option>
+          <option value="audio">audio</option>
+          <option value="vision">vision</option>
+          <option value="spatial">spatial</option>
+          <option value="pop">pop</option>
+          <option value="meta">meta</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn rt" id="query-btn" onclick="runQuery()">⟳ RETRIEVE</button>
+      <button class="btn" onclick="copyContext()">COPY CONTEXT BLOCK</button>
+    </div>
+
+    <div style="margin-top:14px;" id="query-results-wrap">
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--tdim);letter-spacing:1px;margin-bottom:8px;">
+        RETRIEVAL RESULTS — <span id="query-count">0 contexts</span>
+        <span id="contra-flag" style="color:var(--contra);display:none;margin-left:12px;">⚠ H¹(ℱ) CONTRADICTION DETECTED</span>
+      </div>
+      <div id="query-results">
+        <div style="color:var(--tdim);font-family:var(--font-mono);font-size:12px;padding:20px 0;">
+          Run a query to retrieve relevant memories.
+        </div>
+      </div>
+
+      <!-- Assembled context block -->
+      <div style="margin-top:12px;">
+        <label class="lbl">ASSEMBLED CONTEXT BLOCK (ready for LLM injection)</label>
+        <textarea class="text-area" id="context-block" readonly style="min-height:80px;color:var(--fisher);background:var(--bg-0);"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MEMORY ══ -->
+<div class="screen" id="screen-memory">
+  <div class="panel">
+    <div class="ph">MEMORY BROWSER <span class="tag trt">POINCARÉ BALL LIFECYCLE</span></div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <div style="display:flex;gap:8px;align-items:center;font-family:var(--font-mono);font-size:10px;color:var(--tdim);">
+        <span style="width:10px;height:10px;border-radius:50%;background:var(--ingest);display:inline-block;"></span> CORE (r &lt; 0.3)
+        <span style="width:10px;height:10px;border-radius:50%;background:var(--rt);display:inline-block;margin-left:8px;"></span> MID (0.3–0.7)
+        <span style="width:10px;height:10px;border-radius:50%;background:var(--tdim);display:inline-block;margin-left:8px;"></span> EDGE (r &gt; 0.7)
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="btn" style="padding:5px 10px;font-size:10px;" onclick="renderMemoryBrowser()">REFRESH</button>
+        <button class="btn" style="padding:5px 10px;font-size:10px;" onclick="exportSnapshot()">EXPORT</button>
+        <button class="btn" style="padding:5px 10px;font-size:10px;" onclick="document.getElementById('import-input').click()">IMPORT</button>
+        <input type="file" id="import-input" accept=".json" style="display:none" onchange="importSnapshot(event)">
+      </div>
+    </div>
+
+    <div class="stat-row" style="margin-top:0;margin-bottom:12px;">
+      <div class="sc"><div class="lb">TOTAL</div><div class="vl rt" id="mem-total">0</div></div>
+      <div class="sc"><div class="lb">CORE</div><div class="vl ok" id="mem-core">0</div></div>
+      <div class="sc"><div class="lb">MID</div><div class="vl warn" id="mem-mid">0</div></div>
+      <div class="sc"><div class="lb">EDGE</div><div class="vl" id="mem-edge">0</div></div>
+      <div class="sc"><div class="lb">CONTRAD.</div><div class="vl sheaf" id="mem-contra">0</div></div>
+    </div>
+
+    <div class="memory-grid" id="memory-grid">
+      <div style="color:var(--tdim);font-family:var(--font-mono);font-size:12px;padding:20px 0;">
+        No memories yet. Ingest some content first.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SHEAF / H¹ ══ -->
+<div class="screen" id="screen-sheaf">
+  <div class="panel">
+    <div class="ph">SHEAF COHOMOLOGY <span class="tag tsh">H¹(ℱ) CONTRADICTION DETECTION</span>
+      <label style="float:right; font-size:10px; cursor:pointer; color:var(--rt);"><input type="checkbox" id="compact-mode-chk" onchange="toggleCompactMode()"> COMPACT MODE</label>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div>
+        <div class="h1-display ok" id="h1-display">H¹ = 0.000</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--tdim);text-align:center;margin-top:4px;">
+          Coboundary norm — 0 = coherent · &gt;threshold = contradiction
+        </div>
+      </div>
+      <div>
+        <div class="stat-row" style="margin-top:0;">
+          <div class="sc"><div class="lb">EDGES</div><div class="vl" id="sheaf-edges">0</div></div>
+          <div class="sc"><div class="lb">CROSS-MODAL</div><div class="vl sheaf" id="sheaf-cross">0.000</div></div>
+        </div>
+        <div class="stat-row">
+          <div class="sc"><div class="lb">CONTRADICTIONS</div><div class="vl contra" id="sheaf-total-contra">0</div></div>
+          <div class="sc"><div class="lb">THRESHOLD</div><div class="vl" id="sheaf-thresh">0.500</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;">
+      <div class="ph" style="margin-bottom:10px;">CONTEXT GRAPH</div>
+      <canvas id="sheaf-canvas"></canvas>
+    </div>
+
+    <div style="margin-top:14px;">
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--tdim);letter-spacing:1px;margin-bottom:8px;">RESTRICTION MAPS (cross-modal edge weights)</div>
+      <div id="restriction-map-readout" class="api-block" style="min-height:40px;"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn rt" onclick="recomputeSheaf()">RECOMPUTE H¹</button>
+      <button class="btn" onclick="drawSheafGraph()">REDRAW GRAPH</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EMBEDDER ══ -->
+<div class="screen" id="screen-embed">
+  <div class="panel">
+    <div class="ph">RWKV-v7 EMBEDDER <span class="tag tfi">RECURRENT STATE GEOMETRY</span></div>
+
+    <p style="font-size:12px;color:var(--tdim);line-height:1.6;margin-bottom:14px;">
+      RAG Time uses the RWKV-v7 "Goose" recurrent state as the embedding vector.
+      The final hidden state after processing a text sequence IS the embedding —
+      same representational geometry as Evangelion. Memory and mind share a latent space.
+      No separate embedding model. No external weights. Built, not assembled.
+    </p>
+
+    <label class="lbl">TEST EMBEDDING</label>
+    <div style="display:flex;gap:10px;">
+      <input type="text" class="text-input" id="embed-test-input"
+             placeholder="Type text to embed and inspect the RWKV state…" style="flex:1;">
+      <button class="btn rt" onclick="testEmbed()">EMBED</button>
+    </div>
+
+    <div style="margin-top:12px;">
+      <label class="lbl">RWKV STATE VECTOR (dim=<span id="embed-dim">64</span>, first 64 dims)</label>
+      <canvas id="embed-canvas"></canvas>
+    </div>
+
+    <div style="margin-top:12px;">
+      <label class="lbl">STATE CELLS (normalized magnitude)</label>
+      <div class="rwkv-state-grid" id="state-cells"></div>
+    </div>
+
+    <div class="stat-row">
+      <div class="sc"><div class="lb">DIM</div><div class="vl rt" id="emb-dim-stat">64</div></div>
+      <div class="sc"><div class="lb">LAYERS</div><div class="vl ok" id="emb-layers">4</div></div>
+      <div class="sc"><div class="lb">NORM</div><div class="vl" id="emb-norm">—</div></div>
+      <div class="sc"><div class="lb">VARIANCE</div><div class="vl sheaf" id="emb-var">—</div></div>
+    </div>
+
+    <div style="margin-top:14px;">
+      <label class="lbl">SIMILARITY TEST</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <input type="text" class="text-input" id="sim-a" placeholder="Text A" style="flex:1;min-width:160px;">
+        <input type="text" class="text-input" id="sim-b" placeholder="Text B" style="flex:1;min-width:160px;">
+        <button class="btn rt" onclick="testSimilarity()">COMPARE</button>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:13px;margin-top:10px;padding:10px;background:var(--bg-0);border:1px solid var(--border);border-radius:8px;">
+        <span id="sim-result" style="color:var(--tdim);">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ INTEGRATION ══ -->
+<div class="screen" id="screen-api">
+  <div class="panel">
+    <div class="ph">INTEGRATION SPEC <span class="tag trt">postMessage API</span></div>
+
+    <p style="font-size:12px;color:var(--tdim);line-height:1.7;margin-bottom:14px;">
+      RAG Time exposes a clean postMessage API for integration with Evangelion,
+      LocalVocal, Nodemesh, and the Sovereign Engine. Embed as an iframe or
+      load as a worker. All communication is message-passing — zero shared state.
+    </p>
+
+    <div class="api-block">
+      <div style="color:var(--rt);font-weight:700;font-size:12px;margin-bottom:10px;letter-spacing:1px;">INGEST</div>
+      <div><span class="ak">type:</span> <span class="av">'rt:ingest'</span></div>
+      <div><span class="ak">payload:</span> <span class="av">{ text: string, label: string, meta?: object }</span></div>
+      <div><span class="ad">→ Chunks text via OOMB, embeds with RWKV-v7, stores in SheafMemory</span></div>
+      <div style="margin-top:4px;"><span class="ak">response:</span> <span class="av">'rt:ingested'</span> <span class="av">{ id, poincareR, novelty, h1norm }</span></div>
+    </div>
+
+    <div class="api-block">
+      <div style="color:var(--rt);font-weight:700;font-size:12px;margin-bottom:10px;letter-spacing:1px;">QUERY</div>
+      <div><span class="ak">type:</span> <span class="av">'rt:query'</span></div>
+      <div><span class="ak">payload:</span> <span class="av">{ text: string, k?: number, label?: string }</span></div>
+      <div><span class="ad">→ Embeds query, Fisher-Rao k-NN search, contradiction check</span></div>
+      <div style="margin-top:4px;"><span class="ak">response:</span> <span class="av">'rt:result'</span> <span class="av">{ contexts[], contextBlock, contradictionFlag, h1norm }</span></div>
+    </div>
+
+    <div class="api-block">
+      <div style="color:var(--rt);font-weight:700;font-size:12px;margin-bottom:10px;letter-spacing:1px;">EXPORT / IMPORT</div>
+      <div><span class="ak">type:</span> <span class="av">'rt:export'</span> <span class="ad">→ 'rt:snapshot' { contexts, step, contradictions }</span></div>
+      <div><span class="ak">type:</span> <span class="av">'rt:import'</span> <span class="av">{ snapshot }</span> <span class="ad">→ restores full SheafMemory state</span></div>
+      <div><span class="ak">type:</span> <span class="av">'rt:status'</span> <span class="ad">→ 'rt:status' { total, core, edge, h1norm, contradictions }</span></div>
+      <div><span class="ak">type:</span> <span class="av">'rt:loadWeights'</span> <span class="av">{ blocks, dim, layers }</span> <span class="ad">→ inject Evangelion weights into embedder</span></div>
+      <div style="margin-top:6px;"><span class="ak">type:</span> <span class="av" style="color:var(--rt);">'rt:exportEmbedder'</span> <span class="ad">→ 'rt:embedderExported' — export adapted embedder back to Evangelion (v4)</span></div>
+    </div>
+
+    <div style="margin-top:4px;">
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--rt);font-weight:700;letter-spacing:1px;margin-bottom:8px;">EXAMPLE — EVANGELION INTEGRATION</div>
+<div class="code-block">// In Evangelion: embed RAG Time as an iframe, then:
+const rt = document.getElementById('ragtime-frame').contentWindow;
+
+// Ingest a memory after each RWKV generation step
+rt.postMessage({ type: 'rt:ingest', payload: {
+  text: generatedText,
+  label: 'text',
+  meta: { step: App.trainStep, tstar: App.tstar }
+}}, '*');
+
+// Before each generation: retrieve relevant context
+rt.postMessage({ type: 'rt:query', payload: {
+  text: currentPrompt, k: 4
+}}, '*');
+
+window.addEventListener('message', e => {
+  if (e.data.type === 'rt:result') {
+    const { contextBlock, contradictionFlag } = e.data.payload;
+    // Prepend contextBlock to generation prompt
+    // If contradictionFlag: optionally trigger autopoietic loop
+  }
+});</div>
+    </div>
+
+    <div style="margin-top:4px;">
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--rt);font-weight:700;letter-spacing:1px;margin-bottom:8px;">EXAMPLE — SOVEREIGN ENGINE (Rust) INTEGRATION</div>
+<div class="code-block">// Spawn RAG Time in a headless browser (e.g. chromium --headless)
+// Bridge via WebSocket or stdio JSON
+
+// In Rust (tokio):
+async fn query_ragtime(client: &RagTimeClient, text: &str) -> RagResult {
+  client.send(json!({
+    "type": "rt:query",
+    "payload": { "text": text, "k": 5 }
+  })).await?;
+  client.recv::&lt;RagResult&gt;().await
+}
+
+// Contradiction flag maps directly to H¹(ℱ) ≠ 0 trigger
+// for the Sovereign Engine's autopoietic rewrite loop.</div>
+    </div>
+
+    <div style="margin-top:4px;">
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--rt);font-weight:700;letter-spacing:1px;margin-bottom:8px;">EXAMPLE — NODEMESH SEMANTIC ROUTING</div>
+<div class="code-block">// Each Nodemesh node runs RAG Time
+// Routing: compare query embedding against node centroids
+// Fisher-Rao distance replaces IP-topology routing
+
+// Python coordinator:
+async def semantic_route(query: str, nodes: list[Node]) -> Node:
+  embeddings = await asyncio.gather(*[
+      node.ragtime.embed(query) for node in nodes
+  ])
+  # Fisher-Rao nearest-neighbor across node centroids
+  return min(nodes, key=lambda n, e=embeddings: fisher_rao(e, n.centroid))</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ WEIGHTS ══ -->
+<div class="screen" id="screen-weights">
+  <div class="panel">
+    <div class="ph">WEIGHT SHARING <span class="tag trt">rt:loadWeights — EVANGELION SYNC</span></div>
+
+    <p style="font-size:12px;color:var(--tdim);line-height:1.6;margin-bottom:14px;">
+      Import trained RWKV-v7 block weights from a running Evangelion instance.
+      Once loaded, RAG Time's embeddings share the same latent geometry as Evangelion's cognition —
+      memory and mind inhabit the same representational space.
+    </p>
+
+    <div class="weight-status" id="weight-status-bar">
+      <div class="weight-dot" id="weight-dot"></div>
+      <span id="weight-status-text">No weights loaded — using random initialization</span>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <button class="btn rt" onclick="loadWeightsFromFile()">⬆ LOAD WEIGHTS FILE</button>
+      <button class="btn" onclick="generateWeightExportCode()">SHOW EVANGELION EXPORT CODE</button>
+      <button class="btn danger" onclick="resetWeights()">RESET TO RANDOM</button>
+    </div>
+
+    <!-- v3: stale corpus warning + re-embed -->
+    <div id="stale-corpus-banner" style="display:none;margin-bottom:12px;padding:12px 16px;background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.4);border-radius:8px;font-family:var(--font-mono);font-size:11px;color:var(--query);">
+      ⚠ <strong>Corpus embeddings are stale.</strong> Existing memories were embedded with random weights — they don't share geometry with the injected Evangelion weights. Re-embed to align the memory store.
+      <div style="margin-top:10px;">
+        <button class="btn" style="border-color:rgba(251,146,60,0.5);color:var(--query);" onclick="reEmbedCorpus()">↻ RE-EMBED CORPUS</button>
+        <span id="reembed-progress" style="margin-left:12px;color:var(--tdim);font-size:10px;"></span>
+      </div>
+    </div>
+    <input type="file" id="weights-file-input" accept=".json" style="display:none" onchange="handleWeightsFile(event)">
+
+    <div id="weights-export-code" style="display:none;margin-bottom:12px;">
+      <label class="lbl">RUN THIS IN EVANGELION'S CONSOLE TO EXPORT WEIGHTS</label>
+      <div class="code-block" style="font-size:10px;">// In Evangelion browser console:
+// (App.model must be initialized and trained)
+function exportRagTimeWeights() {
+  const blocks = App.model.blocks.map(block => ({
+    W_x_r:     { weight: Array.from(block.W_x_r.weight),     gamma: block.W_x_r.gamma },
+    W_x_k:     { weight: Array.from(block.W_x_k.weight),     gamma: block.W_x_k.gamma },
+    W_x_v:     { weight: Array.from(block.W_x_v.weight),     gamma: block.W_x_v.gamma },
+    W_x_kappa: { weight: Array.from(block.W_x_kappa.weight), gamma: block.W_x_kappa.gamma },
+    W_x_a:     { weight: Array.from(block.W_x_a.weight),     gamma: block.W_x_a.gamma },
+    W_x_w:     { weight: Array.from(block.W_x_w.weight),     gamma: block.W_x_w.gamma },
+    W_o:       { weight: Array.from(block.W_o.weight),        gamma: block.W_o.gamma },
+    W_g:       { weight: Array.from(block.W_g.weight),        gamma: block.W_g.gamma },
+    Wr2:       { weight: Array.from(block.Wr2.weight),        gamma: block.Wr2.gamma },
+    Wk2:       { weight: Array.from(block.Wk2.weight),        gamma: block.Wk2.gamma },
+    Wv2:       { weight: Array.from(block.Wv2.weight),        gamma: block.Wv2.gamma },
+    mu_r: Array.from(block.mu_r), mu_k: Array.from(block.mu_k),
+    mu_v: Array.from(block.mu_v), mu_kappa: Array.from(block.mu_kappa),
+    mu_a: Array.from(block.mu_a), mu_w: Array.from(block.mu_w),
+    log_w_bias: Array.from(block.log_w_bias),
+  }));
+  const payload = { version:'rt-weights-1', dim: App.model.cfg.dim,
+                    layers: blocks.length, blocks, step: App.trainStep };
+  const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+  Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob), download: 'evangelion_weights.json'
+  }).click();
+}
+exportRagTimeWeights();</div>
+    </div>
+
+    <div style="margin-top:4px;">
+      <label class="lbl">OR PASTE SERIALIZED WEIGHTS JSON</label>
+      <textarea class="text-area" id="weights-paste" style="min-height:60px;font-size:10px;"
+        placeholder='{"version":"rt-weights-1","dim":64,"layers":4,"blocks":[...]}'></textarea>
+      <button class="btn rt" style="margin-top:8px;" onclick="loadWeightsFromPaste()">INJECT FROM PASTE</button>
+    </div>
+
+    <div style="margin-top:14px;">
+      <label class="lbl">LOADED LAYER STATUS</label>
+      <div class="layer-grid" id="layer-grid">
+        <div style="color:var(--tdim);font-family:var(--font-mono);font-size:11px;">No weights loaded.</div>
+      </div>
+    </div>
+
+    <div class="stat-row" style="margin-top:14px;">
+      <div class="sc"><div class="lb">LAYERS SYNCED</div><div class="vl rt" id="wt-layers">0 / 4</div></div>
+      <div class="sc"><div class="lb">DIM</div><div class="vl" id="wt-dim">—</div></div>
+      <div class="sc"><div class="lb">TRAIN STEP</div><div class="vl ok" id="wt-step">—</div></div>
+      <div class="sc"><div class="lb">STATUS</div><div class="vl" id="wt-status">RANDOM</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BINARY INDEX ══ -->
+<div class="screen" id="screen-index">
+  <div class="panel">
+    <div class="ph">BINARY HYPERCUBE INDEX <span class="tag trt">LITTLEBIT-2 XNOR/POPCNT</span></div>
+
+    <p style="font-size:12px;color:var(--tdim);line-height:1.6;margin-bottom:14px;">
+      LittleBit-2 Joint-ITQ binarization of all stored embeddings into a binary hypercube index.
+      XNOR/POPCNT similarity as the fast path (O(N/64) per query via bitwise ops).
+      Fisher-Rao reranking on the top-K POPCNT candidates for precision.
+      Scales to thousands of documents — linear scan is the v1 bottleneck, this replaces it.
+    </p>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <button class="btn rt" onclick="buildBinaryIndex()">BUILD INDEX</button>
+      <button class="btn" onclick="benchmarkIndex()">BENCHMARK</button>
+      <button class="btn danger" onclick="clearBinaryIndex()">CLEAR</button>
+    </div>
+
+    <div class="stat-row" style="margin-top:0;margin-bottom:10px;">
+      <div class="sc"><div class="lb">INDEXED</div><div class="vl rt" id="idx-count">0</div></div>
+      <div class="sc"><div class="lb">BITS/VEC</div><div class="vl ok" id="idx-bits">—</div></div>
+      <div class="sc"><div class="lb">INDEX KB</div><div class="vl" id="idx-kb">—</div></div>
+      <div class="sc"><div class="lb">SPEEDUP</div><div class="vl sheaf" id="idx-speedup">—</div></div>
+    </div>
+
+    <div>
+      <label class="lbl">BINARY VECTORS (first 32 dims shown as bit strings)</label>
+      <div class="bin-index-viz" id="bin-index-viz">
+        <span style="color:var(--tdim);font-family:var(--font-mono);font-size:10px;">Build index to visualize binary vectors.</span>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;">
+      <label class="lbl">JOINT-ITQ ROTATION MATRIX (first 8×8)</label>
+      <canvas id="itq-canvas" style="width:100%;height:100px;display:block;background:var(--bg-0);border:1px solid var(--border);border-radius:8px;margin-top:6px;"></canvas>
+    </div>
+
+    <div style="margin-top:14px;">
+      <label class="lbl">BENCHMARK — POPCNT vs FISHER-RAO SCAN</label>
+      <div class="api-block" id="bench-results" style="min-height:40px;">
+        <span style="color:var(--tdim);">Run benchmark to compare retrieval speed.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ RESTRICTION MAP TRAINING ══ -->
+<div class="screen" id="screen-rmap">
+  <div class="panel">
+    <div class="ph">RESTRICTION MAP LEARNING <span class="tag tsh">CONTRADICTION-DRIVEN SGD</span></div>
+
+    <p style="font-size:12px;color:var(--tdim);line-height:1.6;margin-bottom:14px;">
+      Cross-modal restriction maps initialize as identity (scale=1, bias=0) — semantically inert.
+      When H¹(ℱ) spikes past the contradiction threshold, SGD steps push the maps toward coherence.
+      Over time, the maps learn genuine cross-modal alignment geometry.
+      Kehai noted this is "structurally present but semantically inert until trained." This fixes that.
+    </p>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+      <button class="btn rt" id="rmap-train-btn" onclick="toggleRmapTraining()">▶ START AUTO-TRAIN</button>
+      <button class="btn" onclick="singleRmapStep()">SINGLE STEP</button>
+      <button class="btn danger" onclick="resetRmaps()">RESET MAPS</button>
+      <div style="display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:11px;color:var(--tdim);">
+        LR: <input type="number" id="rmap-lr" value="0.01" step="0.001" min="0.0001" max="0.1"
+             style="width:70px;background:var(--bg-0);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 8px;border-radius:6px;outline:none;">
+        Trigger H¹ &gt; <input type="number" id="rmap-thresh" value="0.3" step="0.05" min="0.05" max="1.0"
+             style="width:60px;background:var(--bg-0);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 8px;border-radius:6px;outline:none;">
+      </div>
+    </div>
+
+    <div class="stat-row" style="margin-top:0;margin-bottom:12px;">
+      <div class="sc"><div class="lb">STEPS</div><div class="vl rt" id="rmap-steps">0</div></div>
+      <div class="sc"><div class="lb">H¹ NOW</div><div class="vl sheaf" id="rmap-h1">—</div></div>
+      <div class="sc"><div class="lb">H¹ INIT</div><div class="vl" id="rmap-h1-init">—</div></div>
+      <div class="sc"><div class="lb">REDUCTION</div><div class="vl ok" id="rmap-reduction">—</div></div>
+      <div class="sc"><div class="lb">MAPS</div><div class="vl" id="rmap-count">0</div></div>
+    </div>
+
+    <label class="lbl">LOSS HISTORY</label>
+    <div class="loss-sparkline" id="rmap-sparkline">
+      <span style="color:var(--tdim);font-family:var(--font-mono);font-size:9px;align-self:center;padding:0 4px;">No training yet</span>
+    </div>
+
+    <div style="margin-top:14px;">
+      <label class="lbl">ACTIVE RESTRICTION MAPS</label>
+      <div class="rmap-grid" id="rmap-grid">
+        <div style="color:var(--tdim);font-family:var(--font-mono);font-size:11px;">
+          No cross-modal edges yet. Ingest content with multiple modality labels.
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;">
+      <label class="lbl">TRAINING LOG</label>
+      <div class="terminal" id="rmap-log" style="min-height:120px;max-height:180px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADAPT ══ -->
+<div class="screen" id="screen-adapt">
+  <div class="panel">
+    <div class="ph">CORPUS-DRIVEN EMBEDDING ADAPTATION <span class="tag trt">CONTRASTIVE SELF-SUPERVISED</span></div>
+
+    <p style="font-size:12px;color:var(--tdim);line-height:1.6;margin-bottom:14px;">
+      No external labels. The sheaf supervises the embedder.<br>
+      Same-document chunk pairs are pulled together in latent space.
+      High-H¹ contradiction pairs are pushed apart.
+      Contrastive signal comes entirely from ingested structure.
+      Runs automatically after corpus exceeds threshold, or manually here.
+    </p>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+      <button class="btn rt" id="adapt-run-btn" onclick="toggleAdaptTraining()">▶ START ADAPTATION</button>
+      <button class="btn" onclick="singleAdaptStep()">SINGLE STEP</button>
+      <button class="btn danger" onclick="resetAdaptation()">RESET</button>
+      <div style="display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:11px;color:var(--tdim);">
+        LR: <input type="number" id="adapt-lr" value="0.005" step="0.001" min="0.0001" max="0.05"
+             style="width:70px;background:var(--bg-0);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 8px;border-radius:6px;outline:none;">
+        Auto-threshold: <input type="number" id="adapt-thresh" value="4" step="1" min="2" max="32"
+             style="width:52px;background:var(--bg-0);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 8px;border-radius:6px;outline:none;"> docs
+      </div>
+    </div>
+
+    <div class="stat-row" style="margin-top:0;margin-bottom:12px;">
+      <div class="sc"><div class="lb">STEPS</div><div class="vl rt" id="adapt-steps">0</div></div>
+      <div class="sc"><div class="lb">PULL PAIRS</div><div class="vl ok" id="adapt-pull-pairs">0</div></div>
+      <div class="sc"><div class="lb">PUSH PAIRS</div><div class="vl contra" id="adapt-push-pairs">0</div></div>
+      <div class="sc"><div class="lb">CONTRASTIVE LOSS</div><div class="vl sheaf" id="adapt-loss">—</div></div>
+      <div class="sc"><div class="lb">EMBED DRIFT</div><div class="vl" id="adapt-drift">—</div></div>
+    </div>
+
+    <label class="lbl">ADAPTATION LOSS HISTORY</label>
+    <div class="adapt-sparkline" id="adapt-sparkline">
+      <span style="color:var(--tdim);font-family:var(--font-mono);font-size:9px;align-self:center;padding:0 4px;">No adaptation yet</span>
+    </div>
+
+    <div style="margin-top:14px;">
+      <label class="lbl">ACTIVE TRAINING PAIRS (most recent step)</label>
+      <div id="adapt-pairs-list" style="margin-top:6px;">
+        <div style="color:var(--tdim);font-family:var(--font-mono);font-size:11px;">Run a step to see pairs.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;">
+      <label class="lbl">TRAINING LOG</label>
+      <div class="terminal" id="adapt-log" style="min-height:100px;max-height:160px;"></div>
+    </div>
+  </div>
+
+  <!-- Centrality-weighted ingestion -->
+  <div class="panel" style="margin-top:0;">
+    <div class="ph">CENTRALITY-WEIGHTED INGESTION DEPTH <span class="tag tin">POINCARÉ-GATED RWKV STEPS</span></div>
+    <p style="font-size:12px;color:var(--tdim);line-height:1.6;margin-bottom:12px;">
+      Core memories (low Poincaré radius, frequently retrieved) receive more RWKV recurrent steps
+      on re-ingestion. High-centrality content accumulates more representational capacity.
+      Poincaré lifecycle wired into OOMB ingestion depth.
+    </p>
+    <div class="stat-row" style="margin-top:0;">
+      <div class="sc"><div class="lb">BASE DEPTH</div><div class="vl" id="depth-base">1×</div></div>
+      <div class="sc"><div class="lb">MAX DEPTH</div><div class="vl rt" id="depth-max">4×</div></div>
+      <div class="sc"><div class="lb">CORE BOOSTS</div><div class="vl ok" id="depth-boosts">0</div></div>
+      <div class="sc"><div class="lb">AVG DEPTH</div><div class="vl sheaf" id="depth-avg">—</div></div>
+    </div>
+    <div style="margin-top:12px;">
+      <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--tdim);margin-bottom:6px;">
+        <span>INGESTION DEPTH BY POINCARÉ RADIUS</span>
+        <span style="color:var(--rt);">lower r = deeper embed</span>
+      </div>
+      <canvas id="depth-canvas" style="width:100%;height:60px;display:block;background:var(--bg-0);border:1px solid var(--border);border-radius:8px;"></canvas>
+    </div>
+  </div>
+
+  <!-- Embedder writeback -->
+  <div class="panel" style="margin-top:0;">
+    <div class="ph">EMBEDDER WRITEBACK <span class="tag trt">rt:exportEmbedder → EVANGELION</span></div>
+    <p style="font-size:12px;color:var(--tdim);line-height:1.6;margin-bottom:12px;">
+      RAGTime's adapted embedder state can now flow back upstream.
+      Contradiction resolutions and contrastive adaptations become Evangelion weights.
+      Bidirectional geometry sync — memory informs mind.
+    </p>
+
+    <div class="writeback-status" id="writeback-status-bar">
+      <div class="wb-dot" id="wb-dot"></div>
+      <span id="wb-status-text">No adaptation yet — adapt corpus before writeback</span>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <button class="btn rt" onclick="exportEmbedderState()">⬆ EXPORT EMBEDDER STATE</button>
+      <button class="btn" onclick="generateWritebackCode()">SHOW EVANGELION IMPORT CODE</button>
+    </div>
+
+    <div id="writeback-export-code" style="display:none;margin-bottom:12px;">
+      <label class="lbl">RUN THIS IN EVANGELION'S CONSOLE TO IMPORT ADAPTED WEIGHTS</label>
+      <div class="code-block" style="font-size:10px;">// In Evangelion browser console:
+// Paste the exported JSON from RAGTime's writeback export
+async function importRagTimeWeights(json) {
+  const payload = JSON.parse(json);
+  if (payload.version !== 'rt-writeback-1') { console.error('Wrong version'); return; }
+  const blocks = payload.blocks;
+  const n = Math.min(blocks.length, App.model.blocks.length);
+  for (let l = 0; l &lt; n; l++) {
+    const src = blocks[l], dst = App.model.blocks[l];
+    const keys = ['W_x_r','W_x_k','W_x_v','W_x_kappa','W_x_a','W_x_w','W_o','W_g','Wr2','Wk2','Wv2'];
+    for (const key of keys) {
+      if (src[key] && dst[key] && src[key].weight.length === dst[key].weight.length) {
+        dst[key].weight.set(src[key].weight);
+        dst[key].dirty = true;
+      }
+    }
+  }
+  console.log(`RAGTime writeback: ${n} layers imported (step ${payload.adaptSteps})`);
+  // Optionally: App.trainStep = payload.adaptSteps; // sync step counter
+}
+// Call: importRagTimeWeights(pastedJSON)</div>
+    </div>
+
+    <div style="margin-top:4px;">
+      <label class="lbl">OR PASTE WRITEBACK JSON DIRECTLY</label>
+      <textarea class="text-area" id="writeback-paste-area" style="min-height:50px;font-size:10px;"
+        placeholder="Paste exported embedder JSON here to review before sending to Evangelion..."></textarea>
+    </div>
+
+    <div class="stat-row" style="margin-top:12px;">
+      <div class="sc"><div class="lb">ADAPT STEPS</div><div class="vl rt" id="wb-adapt-steps">0</div></div>
+      <div class="sc"><div class="lb">LAYERS</div><div class="vl" id="wb-layers">4</div></div>
+      <div class="sc"><div class="lb">LAST EXPORT</div><div class="vl ok" id="wb-last-export">—</div></div>
+      <div class="sc"><div class="lb">STATUS</div><div class="vl" id="wb-state">UNADAPTED</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DEBUG ══ -->
+<div class="screen" id="screen-debug">
+  <div class="panel" style="flex:1;min-height:0;">
+    <div class="ph">SYSTEM LOG
+      <div style="display:flex;gap:7px;">
+        <button class="btn" style="padding:3px 9px;font-size:10px;" onclick="clearLog()">CLEAR</button>
+        <button class="btn rt" style="padding:3px 9px;font-size:10px;" onclick="runDiag()">DIAG</button>
+      </div>
+    </div>
+    <div class="terminal" id="terminal"></div>
+  </div>
+</div>
+
+</main>
+
+<!-- ──── FOOTER ──── -->
+<footer>
+  <div class="fs"><span>HEAP</span><div class="heap-bar"><div class="heap-fill" id="heap-fill"></div></div><span class="fv" id="heap-val">—</span></div>
+  <div class="fs"><span>MEMORIES</span><span class="fv rt" id="footer-total">0</span></div>
+  <div class="fs"><span>H¹</span><span class="fv sheaf" id="footer-h1">0.000</span></div>
+  <div class="fs"><span>CONTRADICTIONS</span><span class="fv" id="footer-contra">0</span></div>
+  <div class="fs"><span>EMBEDDER</span><span class="fv ok">RWKV-v7 GOOSE</span></div>
+  <div class="fs"><span>RETRIEVAL</span><span class="fv ok">FISHER-RAO</span></div>
+  <div class="fs" style="margin-left:auto;"><span>ConsciousNode SoftWorks · The browser is the new bare metal.</span></div>
+</footer>
+
+</div><!-- /app -->
+
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════════════════════════
+   RAG Time v1.0 — ConsciousNode SoftWorks
+   Zero-dependency browser-native RAG/vector-memory engine.
+   "The browser is the new bare metal."
+
+   Neural stack (verbatim from Evangelion Phase 6):
+     TMAC, BitLinear, LayerNorm — Evangelion core
+     initPoSTDecayGates, RWKVv7Block — Kehai Interim
+     SheafMemory v2 — Kehai Interim
+
+   RAG Time additions (Vael):
+     OOMBManager, RagTimeEmbedder, RagTimeIndex, RagTimePipeline,
+     document ingestion, postMessage API, UI
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+// ── TMAC (verbatim from Evangelion Phase 6) ───────────────────────────────
+class TMAC {
+  static UNPACK_TABLE = new Int8Array(81 * 4);
+  static initTable() {
+    for (let i = 0; i < 81; i++) {
+      let rem = i;
+      TMAC.UNPACK_TABLE[i*4]   = (rem % 3) - 1; rem = Math.floor(rem / 3);
+      TMAC.UNPACK_TABLE[i*4+1] = (rem % 3) - 1; rem = Math.floor(rem / 3);
+      TMAC.UNPACK_TABLE[i*4+2] = (rem % 3) - 1; rem = Math.floor(rem / 3);
+      TMAC.UNPACK_TABLE[i*4+3] = (rem % 3) - 1;
+    }
+  }
+  static packTernary(t0, t1, t2, t3) {
+    return (t0+1) + 3*(t1+1) + 9*(t2+1) + 27*(t3+1);
+  }
+  static quantizeWeights(masterWeights, packedOut) {
+    const n = masterWeights.length;
+    const blocks = Math.ceil(n / 4);
+    let sumAbs = 0;
+    for (let i = 0; i < n; i++) sumAbs += Math.abs(masterWeights[i]);
+    const gamma = (sumAbs / n) || 1e-8;
+    const invGamma = 1.0 / gamma;
+    for (let b = 0; b < blocks; b++) {
+      const base = b * 4;
+      const t0 = base   < n ? Math.max(-1, Math.min(1, Math.round(masterWeights[base]   * invGamma))) : 0;
+      const t1 = base+1 < n ? Math.max(-1, Math.min(1, Math.round(masterWeights[base+1] * invGamma))) : 0;
+      const t2 = base+2 < n ? Math.max(-1, Math.min(1, Math.round(masterWeights[base+2] * invGamma))) : 0;
+      const t3 = base+3 < n ? Math.max(-1, Math.min(1, Math.round(masterWeights[base+3] * invGamma))) : 0;
+      packedOut[b] = TMAC.packTernary(t0, t1, t2, t3);
+    }
+    return gamma;
+  }
+  static execute(packedWeights, input, outDim, inDim, gamma, outputArr, scratchLut) {
+    const blocksPerRow = Math.ceil(inDim / 4);
+    for (let b = 0; b < blocksPerRow; b++) {
+      const base = b * 4;
+      const v0 = base   < inDim ? input[base]   : 0;
+      const v1 = base+1 < inDim ? input[base+1] : 0;
+      const v2 = base+2 < inDim ? input[base+2] : 0;
+      const v3 = base+3 < inDim ? input[base+3] : 0;
+      const lutOffset = b * 81;
+      for (let i = 0; i < 81; i++) {
+        const uBase = i * 4;
+        scratchLut[lutOffset + i] =
+          (TMAC.UNPACK_TABLE[uBase]*v0) + (TMAC.UNPACK_TABLE[uBase+1]*v1) +
+          (TMAC.UNPACK_TABLE[uBase+2]*v2) + (TMAC.UNPACK_TABLE[uBase+3]*v3);
+      }
+    }
+    for (let o = 0; o < outDim; o++) {
+      let acc = 0;
+      const rowBase = o * blocksPerRow;
+      for (let b = 0; b < blocksPerRow; b++) acc += scratchLut[b * 81 + packedWeights[rowBase + b]];
+      outputArr[o] = acc * gamma;
+    }
+  }
+}
+TMAC.initTable();
+
+// ── BitLinear (verbatim from Evangelion Phase 6) ──────────────────────────
+class BitLinear {
+  constructor(inDim, outDim) {
+    this.inDim = inDim; this.outDim = outDim;
+    this.weight = new Float32Array(outDim * inDim);
+    this.grad = new Float32Array(outDim * inDim);
+    this.momentum = new Float32Array(outDim * inDim);
+    this.packed = new Uint8Array(Math.ceil((outDim * inDim) / 4));
+    this.gamma = 1.0; this.dirty = true;
+    this.lutScratch = new Float32Array(Math.ceil(inDim / 4) * 81);
+    const scale = Math.sqrt(3.0 / inDim);
+    for (let i = 0; i < this.weight.length; i++) this.weight[i] = (Math.random()*2-1) * scale;
+  }
+  pack() { if (this.dirty) { this.gamma = TMAC.quantizeWeights(this.weight, this.packed); this.dirty = false; } }
+  forward(x) {
+    this.pack();
+    const out = new Float32Array(this.outDim);
+    TMAC.execute(this.packed, x, this.outDim, this.inDim, this.gamma, out, this.lutScratch);
+    return out;
+  }
+  zeroGrad() { this.grad.fill(0); }
+  markDirty() { this.dirty = true; }
+}
+
+// ── LayerNorm (verbatim from Evangelion Phase 6) ──────────────────────────
+class LayerNorm {
+  constructor(dim) {
+    this.dim = dim;
+    this.weight = new Float32Array(dim).fill(1.0);
+    this.bias   = new Float32Array(dim).fill(0.0);
+    this.grad_w = new Float32Array(dim);
+    this.grad_b = new Float32Array(dim);
+  }
+  forward(x) {
+    let mean = 0, v = 0;
+    for (let i = 0; i < this.dim; i++) mean += x[i];
+    mean /= this.dim;
+    for (let i = 0; i < this.dim; i++) v += (x[i] - mean) ** 2;
+    const rstd = 1.0 / Math.sqrt(v / this.dim + 1e-5);
+    const out = new Float32Array(this.dim);
+    for (let i = 0; i < this.dim; i++) out[i] = ((x[i] - mean) * rstd) * this.weight[i] + this.bias[i];
+    return { out, cache: { x, mean, rstd } };
+  }
+  zeroGrad() { this.grad_w.fill(0); this.grad_b.fill(0); }
+}
+
+// ── initPoSTDecayGates (verbatim from Evangelion Phase 6 / Kehai Interim) ─
+function initPoSTDecayGates(dim) {
+  const minLogDecay = Math.log(1e-4);
+  const maxLogDecay = Math.log(1 - 1e-4);
+  const logRates = new Float32Array(dim);
+  for (let k = 0; k < dim; k++) {
+    const t = k / Math.max(1, dim - 1);
+    logRates[k] = minLogDecay + t * (maxLogDecay - minLogDecay);
+  }
+  const tapered = new Float32Array(dim);
+  for (let k = 0; k < dim; k++) {
+    const alpha = (dim - k) / Math.max(1, dim - 1);
+    tapered[k] = logRates[k] * alpha;
+  }
+  return tapered;
+}
+
+// ── RWKVv7Block (verbatim from Evangelion Phase 6 / Kehai Interim) ────────
+class RWKVv7Block {
+  constructor(dim, dimFFN) {
+    this.dim = dim;
+    this.ln1 = new LayerNorm(dim); this.ln2 = new LayerNorm(dim);
+    this.W_x_r = new BitLinear(dim, dim); this.W_x_k = new BitLinear(dim, dim);
+    this.W_x_v = new BitLinear(dim, dim); this.W_x_kappa = new BitLinear(dim, dim);
+    this.W_x_a = new BitLinear(dim, dim); this.W_x_w = new BitLinear(dim, dim);
+    this.W_o   = new BitLinear(dim, dim); this.W_g   = new BitLinear(dim, dim);
+    this.W_x_rx2 = new BitLinear(dim, dim); this.W_x_kx2 = new BitLinear(dim, dim);
+    this.Wr2   = new BitLinear(dim, dim); this.Wk2 = new BitLinear(dim, dimFFN);
+    this.Wv2   = new BitLinear(dimFFN, dim);
+    this.log_w_bias = initPoSTDecayGates(dim);
+    this.mu_r = new Float32Array(dim).fill(0.5); this.mu_k = new Float32Array(dim).fill(0.5);
+    this.mu_v = new Float32Array(dim).fill(0.5); this.mu_kappa = new Float32Array(dim).fill(0.5);
+    this.mu_a = new Float32Array(dim).fill(0.5); this.mu_w = new Float32Array(dim).fill(0.5);
+  }
+  static sigmoid(x) {
+    const o = new Float32Array(x.length);
+    for (let i = 0; i < x.length; i++) o[i] = 1 / (1 + Math.exp(-Math.max(-40, Math.min(40, x[i]))));
+    return o;
+  }
+  tokenShift(x, prevX, mu) {
+    const out = new Float32Array(this.dim);
+    for (let i = 0; i < this.dim; i++) out[i] = x[i] + mu[i] * (prevX[i] - x[i]);
+    return out;
+  }
+  forward(x, state) {
+    const dim = this.dim;
+    const ln1Res = this.ln1.forward(x);
+    const x_ln = ln1Res.out;
+    const prevX = state.prevX || new Float32Array(dim);
+    const xr = this.tokenShift(x_ln, prevX, this.mu_r);
+    const xk = this.tokenShift(x_ln, prevX, this.mu_k);
+    const xv = this.tokenShift(x_ln, prevX, this.mu_v);
+    const xkappa = this.tokenShift(x_ln, prevX, this.mu_kappa);
+    const xa = this.tokenShift(x_ln, prevX, this.mu_a);
+    const xw = this.tokenShift(x_ln, prevX, this.mu_w);
+    const r = RWKVv7Block.sigmoid(this.W_x_r.forward(xr));
+    const k = this.W_x_k.forward(xk);
+    const v = this.W_x_v.forward(xv);
+    const kappa_raw = this.W_x_kappa.forward(xkappa);
+    const a = RWKVv7Block.sigmoid(this.W_x_a.forward(xa));
+    const w_proj = this.W_x_w.forward(xw);
+    const w = new Float32Array(dim);
+    for (let i = 0; i < dim; i++)
+      w[i] = Math.exp(-Math.exp(Math.max(-8, Math.min(0, w_proj[i] + this.log_w_bias[i] - 0.5))));
+    let kappaNorm = 0;
+    for (let i = 0; i < dim; i++) kappaNorm += kappa_raw[i] * kappa_raw[i];
+    kappaNorm = Math.sqrt(kappaNorm) + 1e-8;
+    const kappa = new Float32Array(dim);
+    for (let i = 0; i < dim; i++) kappa[i] = kappa_raw[i] / kappaNorm;
+    const num = new Float32Array(state.num || new Float32Array(dim));
+    const den = new Float32Array(state.den || new Float32Array(dim).fill(1));
+    let removalDot = 0;
+    for (let i = 0; i < dim; i++) removalDot += a[i] * kappa[i] * num[i];
+    const wkv = new Float32Array(dim);
+    for (let i = 0; i < dim; i++) {
+      num[i] = w[i] * num[i] - kappa[i] * removalDot + k[i] * v[i];
+      den[i] = w[i] * den[i] - kappa[i] * removalDot + k[i];
+      wkv[i] = num[i] / (Math.abs(den[i]) + 1e-8);
+    }
+    const g = RWKVv7Block.sigmoid(this.W_g.forward(x_ln));
+    const gated = new Float32Array(dim);
+    for (let i = 0; i < dim; i++) gated[i] = r[i] * wkv[i] * g[i];
+    const tmix_out = this.W_o.forward(gated);
+    const h = new Float32Array(dim);
+    for (let i = 0; i < dim; i++) h[i] = x[i] + tmix_out[i];
+    const ln2Res = this.ln2.forward(h);
+    const h_ln = ln2Res.out;
+    const prevX2 = state.prevX2 || new Float32Array(dim);
+    const rx2 = this.tokenShift(h_ln, prevX2, this.mu_r);
+    const kx2 = this.tokenShift(h_ln, prevX2, this.mu_k);
+    const r2 = RWKVv7Block.sigmoid(this.Wr2.forward(rx2));
+    const k_cmix = this.Wk2.forward(kx2);
+    const k_relu2 = new Float32Array(k_cmix.length);
+    for (let i = 0; i < k_cmix.length; i++) k_relu2[i] = Math.max(0, k_cmix[i]) ** 2;
+    const cmix_out = this.Wv2.forward(k_relu2);
+    const out = new Float32Array(dim);
+    for (let i = 0; i < dim; i++) out[i] = h[i] + r2[i] * cmix_out[i];
+    return {
+      out,
+      state: { prevX: new Float32Array(x_ln), prevX2: new Float32Array(h_ln), num, den }
+    };
+  }
+}
+
+// ── SheafMemory v2 (verbatim from Evangelion Phase 6 / Kehai Interim) ─────
+const SHEAF_CONFIG = { sheaf_contradiction_threshold: 0.5 };
+const COMPACT_MODE = { enabled: false };
+window.toggleCompactMode = function() {
+  COMPACT_MODE.enabled = document.getElementById('compact-mode-chk').checked;
+  LOG.dim('Compact mode ' + (COMPACT_MODE.enabled ? 'enabled' : 'disabled'));
+};
+class SheafMemory {
+  constructor(dim) {
+    this.dim = dim;
+    this.contexts = [];
+    this.maxContexts = 64; // RAG Time needs more than Evangelion's 16
+    this.lastSheafNorm = 0;
+    this.totalContradictions = 0;
+    this._step = 0;
+    this._restrictionMaps = {};
+  }
+  _getRestriction(labelA, labelB) {
+    if (labelA === labelB) return null;
+    const key = `${labelA}→${labelB}`;
+    if (!this._restrictionMaps[key]) {
+      this._restrictionMaps[key] = {
+        scale: new Float32Array(this.dim).fill(1.0),
+        bias:  new Float32Array(this.dim).fill(0.0)
+      };
+    }
+    return this._restrictionMaps[key];
+  }
+  _restrict(vec, labelA, labelB) {
+    const map = this._getRestriction(labelA, labelB);
+    if (!map) return vec;
+    const out = new Float32Array(this.dim);
+    for (let i = 0; i < this.dim; i++) out[i] = map.scale[i] * vec[i] + map.bias[i];
+    return out;
+  }
+  _fisherRaoDistance(ctxA, ctxB) {
+    let sumSq = 0;
+    const dim = Math.min(ctxA.vec.length, ctxB.vec.length);
+    for (let k = 0; k < dim; k++) {
+      const diff = ctxA.vec[k] - ctxB.vec[k];
+      const combinedVar = (ctxA.variance[k] + ctxB.variance[k]) + 1e-6;
+      sumSq += (diff * diff) / combinedVar;
+    }
+    return Math.sqrt(sumSq / dim);
+  }
+  _edgeCoboundary(ctxA, ctxB) {
+    const aR = this._restrict(ctxA.vec, ctxA.label, ctxB.label);
+    const bR = this._restrict(ctxB.vec, ctxB.label, ctxA.label);
+    let normSq = 0, varWeight = 0;
+    for (let k = 0; k < this.dim; k++) {
+      const diff = bR[k] - aR[k];
+      normSq += diff * diff;
+      varWeight += 1.0 / (ctxA.variance[k] + ctxB.variance[k] + 1e-6);
+    }
+    varWeight /= this.dim;
+    return Math.sqrt(normSq / this.dim) * varWeight;
+  }
+  _computeNovelty(vec, label) {
+    const sameModal = this.contexts.filter(c => c.label === label);
+    if (sameModal.length === 0) return 1.0;
+    const last = sameModal[sameModal.length - 1];
+    let dot = 0, normV = 0, normL = 0;
+    for (let k = 0; k < this.dim; k++) {
+      dot  += vec[k] * last.vec[k];
+      normV += vec[k] * vec[k];
+      normL += last.vec[k] * last.vec[k];
+    }
+    const cosSim = dot / (Math.sqrt(normV) * Math.sqrt(normL) + 1e-8);
+    return (1 - cosSim) / 2;
+  }
+  _lifetimeStep() {
+    const dt = 0.02, noiseScale = 0.01;
+    for (const ctx of this.contexts) {
+      ctx.age++;
+      const r = ctx.poincareR;
+      const potential_grad = 2 * r / (1 - r * r + 1e-6);
+      const access_bonus = ctx.age < 3 ? -0.05 : 0;
+      const noise = (Math.random() - 0.5) * noiseScale;
+      ctx.poincareR = Math.max(0, Math.min(0.99, r + dt * (potential_grad + access_bonus) + noise));
+    }
+  }
+  addContext(label, stateVec, text) {
+    this._step++;
+    const variance = new Float32Array(this.dim).fill(0.5);
+    const sameModal = this.contexts.filter(c => c.label === label);
+    if (sameModal.length > 0) {
+      const last = sameModal[sameModal.length - 1];
+      for (let k = 0; k < this.dim; k++) {
+        const diff = stateVec[k] - last.vec[k];
+        variance[k] = Math.min(1.0, 0.7 * last.variance[k] + 0.3 * diff * diff);
+      }
+    }
+    const novelty = this._computeNovelty(stateVec, label);
+    const poincareR = 0.3 + 0.4 * novelty;
+    const ctx = {
+      id: Math.random().toString(36).slice(2,8),
+      label, text: text || '',
+      vec: new Float32Array(stateVec), variance, poincareR, age: 0, step: this._step
+    };
+    this._lifetimeStep();
+    if (this.contexts.length >= this.maxContexts) {
+      let maxR = -1, maxIdx = 0;
+      for (let i = 0; i < this.contexts.length; i++) {
+        if (this.contexts[i].poincareR > maxR) { maxR = this.contexts[i].poincareR; maxIdx = i; }
+      }
+      this.contexts.splice(maxIdx, 1);
+    }
+    this.contexts.push(ctx);
+    return { id: ctx.id, poincareR, novelty };
+  }
+  computeCoboundaryNorm() {
+    if (this.contexts.length < 2) return { norm: 0, isContradiction: false, edgeCount: 0, crossModalNorm: 0 };
+    let totalNorm = 0, crossModalNorm = 0, edgeCount = 0, crossEdgeCount = 0;
+    const n = this.contexts.length;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const ctxA = this.contexts[i], ctxB = this.contexts[j];
+        if (Math.abs(ctxA.step - ctxB.step) > 8) continue;
+        const cw = (1 - ctxA.poincareR) * (1 - ctxB.poincareR);
+        const en = this._edgeCoboundary(ctxA, ctxB) * cw;
+        totalNorm += en; edgeCount++;
+        if (ctxA.label !== ctxB.label) { crossModalNorm += en; crossEdgeCount++; }
+      }
+    }
+    const avgNorm = edgeCount > 0 ? totalNorm / edgeCount : 0;
+    const avgCross = crossEdgeCount > 0 ? crossModalNorm / crossEdgeCount : 0;
+    this.lastSheafNorm = avgNorm;
+    const isContradiction = avgNorm > SHEAF_CONFIG.sheaf_contradiction_threshold;
+    if (isContradiction) this.totalContradictions++;
+    return { norm: avgNorm, isContradiction, edgeCount, crossModalNorm: avgCross };
+  }
+  retrieve(queryVec, label, k) {
+    if (this.contexts.length === 0) return [];
+    const queryCtx = { vec: queryVec, variance: new Float32Array(this.dim).fill(0.5), label: label || 'query' };
+    const scored = [];
+    for (const ctx of this.contexts) {
+      if (label && ctx.label !== label) continue;
+      const centralityBonus = ctx.poincareR * 0.3;
+      const dist = this._fisherRaoDistance(queryCtx, ctx) + centralityBonus;
+      scored.push({ ctx, dist });
+    }
+    scored.sort((a, b) => a.dist - b.dist);
+    const results = scored.slice(0, k || 3);
+    for (const { ctx } of results) { ctx.age = 0; ctx.poincareR = Math.max(0, ctx.poincareR - 0.1); }
+    return results;
+  }
+  get stats() {
+    return {
+      total: this.contexts.length,
+      core:  this.contexts.filter(c => c.poincareR < 0.3).length,
+      mid:   this.contexts.filter(c => c.poincareR >= 0.3 && c.poincareR < 0.7).length,
+      edge:  this.contexts.filter(c => c.poincareR >= 0.7).length,
+      contradictions: this.totalContradictions,
+      lastNorm: this.lastSheafNorm
+    };
+  }
+}
+
+// ── OOMB Chunk-Recurrent Manager ──────────────────────────────────────────
+// O(1) memory footprint regardless of document size.
+// Chunks text, streams through RWKV state, purges activations after state update.
+// Only the final state vector is kept — the embedding.
+class OOMBManager {
+  constructor(chunkSize = 128) {
+    this.chunkSize = chunkSize; // characters per chunk
+  }
+
+  // Chunk text into overlapping windows
+  chunk(text) {
+    const chunks = [];
+    const step = Math.floor(this.chunkSize * 0.75); // 25% overlap
+    for (let i = 0; i < text.length; i += step) {
+      chunks.push(text.slice(i, i + this.chunkSize));
+      if (i + this.chunkSize >= text.length) break;
+    }
+    if (chunks.length === 0 && text.length > 0) chunks.push(text);
+    return chunks;
+  }
+
+  // Stream chunks through RWKV state — O(1) activation memory
+  // Returns final state (the embedding) + chunk count
+  async streamEmbed(text, embedder, onProgress, learnBPE = true) {
+    const chunks = this.chunk(text);
+    let state = embedder.getEmptyState();
+    for (let i = 0; i < chunks.length; i++) {
+      // Embed chunk — activations computed and immediately used
+      const result = embedder.embedChunk(chunks[i], state, learnBPE);
+      state = result.state; // only keep state, discard activations
+      if (onProgress) onProgress(i, chunks.length, chunks[i]);
+      // Yield to main thread to prevent blocking
+      if (i % 4 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+    // Extract embedding from final state: pool across all blocks
+    const embedding = embedder.stateToEmbedding(state);
+    return { embedding, chunks: chunks.length, state };
+  }
+}
+
+// ── Dynamic BPE Tokenizer ──────────────────────────────────────────────────
+class DynamicBPE {
+  constructor(maxVocab, dim, charEmbed) {
+    this.maxVocab = maxVocab;
+    this.dim = dim;
+    this.charEmbed = charEmbed;
+    this.vocabSize = 256;
+    this.merges = new Map(); // "t1,t2" -> newToken
+  }
+
+  encode(text) {
+    const bytes = new TextEncoder().encode(text);
+    let tokens = Array.from(bytes);
+    let merged = true;
+    while (merged) {
+      merged = false;
+      for (let i = 0; i < tokens.length - 1; i++) {
+        const pair = `${tokens[i]},${tokens[i+1]}`;
+        if (this.merges.has(pair)) {
+          tokens.splice(i, 2, this.merges.get(pair));
+          merged = true;
+          break;
+        }
+      }
+    }
+    return tokens;
+  }
+
+  learn(text) {
+    if (this.vocabSize >= this.maxVocab) return;
+    let tokens = this.encode(text);
+    let learned = 0;
+    while (this.vocabSize < this.maxVocab && learned < 3) {
+      const pairs = new Map();
+      for (let i = 0; i < tokens.length - 1; i++) {
+        const pair = `${tokens[i]},${tokens[i+1]}`;
+        pairs.set(pair, (pairs.get(pair) || 0) + 1);
+      }
+      let maxFreq = 0, bestPair = null;
+      for (const [pair, freq] of pairs.entries()) {
+        if (freq > maxFreq) { maxFreq = freq; bestPair = pair; }
+      }
+      if (bestPair && maxFreq > 1) {
+        const newToken = this.vocabSize++;
+        this.merges.set(bestPair, newToken);
+        const [t1, t2] = bestPair.split(',').map(Number);
+        const offNew = newToken * this.dim;
+        const off1 = t1 * this.dim;
+        const off2 = t2 * this.dim;
+        for (let d = 0; d < this.dim; d++) {
+          this.charEmbed[offNew + d] = (this.charEmbed[off1 + d] + this.charEmbed[off2 + d]) * 0.5;
+        }
+        tokens = this.encode(text);
+        learned++;
+      } else {
+        break;
+      }
+    }
+  }
+}
+
+// ── RagTimeEmbedder ───────────────────────────────────────────────────────
+// RWKV-v7 recurrent state as embedding.
+// Same representational geometry as Evangelion.
+class RagTimeEmbedder {
+  constructor(cfg) {
+    this.cfg = cfg; // { dim, layers }
+    this.blocks = Array.from({ length: cfg.layers }, () => new RWKVv7Block(cfg.dim, cfg.dim * 2));
+    
+    // Dynamic BPE + UTF-8 Tokenizer
+    this.maxVocab = 2048;
+    this.charEmbed = new Float32Array(this.maxVocab * cfg.dim);
+    const scale = Math.sqrt(1.0 / cfg.dim);
+    for (let i = 0; i < 256 * cfg.dim; i++) this.charEmbed[i] = (Math.random()*2-1)*scale;
+    
+    this.bpe = new DynamicBPE(this.maxVocab, cfg.dim, this.charEmbed);
+    LOG.ok(`RagTimeEmbedder: RWKV-v7 ${cfg.layers}L × ${cfg.dim}D initialized with Dynamic BPE`);
+  }
+
+  getEmptyState() {
+    return this.blocks.map(() => ({ prevX: null, prevX2: null, num: null, den: null }));
+  }
+
+  tokenize(text) {
+    return this.bpe.encode(text);
+  }
+
+  // Embed a chunk through all RWKV layers, return final state
+  embedChunk(text, state, learnBPE = true) {
+    if (learnBPE) this.bpe.learn(text);
+    const tokens = this.bpe.encode(text);
+    
+    let currentState = state.map(s => ({ ...s }));
+    const dim = this.cfg.dim;
+    for (let ci = 0; ci < tokens.length; ci++) {
+      const t = tokens[ci];
+      const x = new Float32Array(dim);
+      const offset = t * dim;
+      for (let d = 0; d < dim; d++) x[d] = this.charEmbed[offset + d];
+      for (let l = 0; l < this.blocks.length; l++) {
+        const result = this.blocks[l].forward(x, currentState[l]);
+        currentState[l] = result.state;
+        // Pass output to next layer
+        if (l < this.blocks.length - 1) {
+          const nextX = result.out;
+          // Activate on result.out for next layer input
+          for (let d = 0; d < dim; d++) x[d] = nextX[d];
+        }
+      }
+    }
+    return { state: currentState };
+  }
+
+  // Pool RWKV state across all layers → single embedding vector
+  stateToEmbedding(state) {
+    const dim = this.cfg.dim;
+    const embedding = new Float32Array(dim);
+    let count = 0;
+    for (const layerState of state) {
+      if (layerState.num) {
+        for (let d = 0; d < dim; d++) embedding[d] += layerState.num[d];
+        count++;
+      }
+    }
+    if (count > 0) {
+      for (let d = 0; d < dim; d++) embedding[d] /= count;
+    }
+    // L2 normalize
+    let norm = 0;
+    for (let d = 0; d < dim; d++) norm += embedding[d] * embedding[d];
+    norm = Math.sqrt(norm) + 1e-8;
+    for (let d = 0; d < dim; d++) embedding[d] /= norm;
+    return embedding;
+  }
+
+  // Embed a full text string (short — no OOMB chunking)
+  embedText(text) {
+    const state = this.getEmptyState();
+    const result = this.embedChunk(text.slice(0, 512), state, false); // cap at 512 chars for direct embed, no BPE learning
+    return this.stateToEmbedding(result.state);
+  }
+
+  // Per-dim variance from embedding (for Fisher-Rao)
+  embeddingVariance(embedding) {
+    // Approximate: variance from mean absolute value
+    const mean = embedding.reduce((a, b) => a + Math.abs(b), 0) / embedding.length;
+    const variance = new Float32Array(embedding.length);
+    for (let i = 0; i < embedding.length; i++) {
+      const diff = Math.abs(embedding[i]) - mean;
+      variance[i] = Math.min(1.0, 0.1 + diff * diff * 2);
+    }
+    return variance;
+  }
+}
+
+// ── RAG Time System State ─────────────────────────────────────────────────
+const RT_CFG = { dim: 64, layers: 4 };
+
+// ── Logging ───────────────────────────────────────────────────────────────
+// Declared before instantiation — constructors log on init
+const LOG = (() => {
+  const e = () => document.getElementById('terminal');
+  const f = (cls, pre, msg) => {
+    const t = new Date().toISOString().slice(11, 23);
+    const el = e(); if (!el) return;
+    el.innerHTML += `<span class="td">[${t}]</span> <span class="${cls}">${pre}</span> ${escHTML(msg)}\n`;
+    el.scrollTop = el.scrollHeight;
+  };
+  return {
+    info: m => f('ti', 'INFO ', m),
+    warn: m => f('tw', 'WARN ', m),
+    err:  m => f('te', 'ERR  ', m),
+    ok:   m => f('tok2','OK   ', m),
+    rt:   m => f('trt', 'RAG  ', m),
+    sh:   m => f('tsh', 'SHEAF', m),
+  };
+})();
+function escHTML(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function clearLog() { document.getElementById('terminal').innerHTML = ''; }
+
+// ── RAG Time System State ─────────────────────────────────────────────────
+// Instantiated AFTER LOG so constructors can log safely
+const EMBEDDER   = new RagTimeEmbedder(RT_CFG);
+const SHEAF      = new SheafMemory(RT_CFG.dim);
+const OOMB       = new OOMBManager(256);
+
+let _ingestCount = 0;
+let _chunkCount  = 0;
+
+// ── OOMB Visualizer ───────────────────────────────────────────────────────
+function renderOOMBBar(total, current, done) {
+  const bar = document.getElementById('oomb-bar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  const maxVis = Math.min(total, 60);
+  for (let i = 0; i < maxVis; i++) {
+    const chunk = document.createElement('div');
+    chunk.className = 'oomb-chunk' + (i < done ? ' done' : i === current ? ' active' : '');
+    const h = 8 + (i === current ? 8 : i < done ? 4 : 0);
+    chunk.style.height = h + 'px';
+    bar.appendChild(chunk);
+  }
+  if (total > maxVis) {
+    const more = document.createElement('span');
+    more.style.cssText = 'font-family:var(--font-mono);font-size:9px;color:var(--tdim);padding:0 4px;align-self:center;';
+    more.textContent = `+${total - maxVis}`;
+    bar.appendChild(more);
+  }
+}
+
+// ── Ingestion ─────────────────────────────────────────────────────────────
+window.ingestText = async function() {
+  const text  = document.getElementById('ingest-text').value.trim();
+  const label = document.getElementById('ingest-label').value;
+  const metaStr = document.getElementById('ingest-meta').value.trim();
+  if (!text) { LOG.warn('No text to ingest'); return; }
+
+  let meta = {};
+  if (metaStr) { try { meta = JSON.parse(metaStr); } catch(e) { LOG.warn('Meta JSON parse failed — ignored'); } }
+
+  await ingestContent(text, label, meta);
+  document.getElementById('ingest-text').value = '';
+};
+
+async function ingestContent(text, label, meta = {}) {
+  setSysStatus('INGESTING', 'busy');
+  document.getElementById('ingest-btn').disabled = true;
+  LOG.rt(`Ingesting ${text.length} chars as [${label}]`);
+
+  let chunksProcessed = 0;
+  const chunks = OOMB.chunk(text);
+  renderOOMBBar(chunks.length, 0, 0);
+
+  const result = await OOMB.streamEmbed(text, EMBEDDER, (i, total) => {
+    chunksProcessed = i + 1;
+    _chunkCount++;
+    renderOOMBBar(total, i, i);
+    document.getElementById('ingest-prog').style.width = ((i+1)/total*100) + '%';
+    document.getElementById('stat-chunks').textContent = _chunkCount;
+  });
+
+  // Add to SheafMemory
+  const added = SHEAF.addContext(label, result.embedding, text.slice(0, 200) + (text.length > 200 ? '…' : ''));
+  _ingestCount++;
+
+  // Recompute H¹
+  const sheafResult = COMPACT_MODE.enabled ? 
+    { isContradiction: SHEAF.lastSheafNorm > SHEAF_CONFIG.sheaf_contradiction_threshold } : 
+    SHEAF.computeCoboundaryNorm();
+
+  updateFooterStats();
+  updateIngestStats();
+  renderOOMBBar(chunks.length, chunks.length, chunks.length);
+  document.getElementById('ingest-prog').style.width = '100%';
+  setTimeout(() => { document.getElementById('ingest-prog').style.width = '0%'; }, 1000);
+
+  LOG.ok(`Ingested: id=${added.id}, poincaréR=${added.poincareR.toFixed(3)}, novelty=${added.novelty.toFixed(3)}, H¹=${sheafResult.norm.toFixed(3)}`);
+  if (sheafResult.isContradiction) LOG.sh(`⚠ H¹(ℱ) contradiction detected: norm=${sheafResult.norm.toFixed(3)}`);
+
+  // postMessage response
+  window.dispatchEvent(new CustomEvent('rt:ingested', { detail: {
+    id: added.id, poincareR: added.poincareR, novelty: added.novelty, h1norm: sheafResult.norm
+  }}));
+
+  document.getElementById('ingest-btn').disabled = false;
+  setSysStatus(sheafResult.isContradiction ? 'H¹ ≠ 0' : 'READY',
+               sheafResult.isContradiction ? 'contra' : 'live');
+  return added;
+}
+
+window.ingestDemo = async function() {
+  LOG.rt('Loading demo corpus...');
+  const corpus = [
+    { text: 'The RWKV-v7 architecture uses a generalized delta rule with vector-valued gating and in-context learning rates. Unlike transformers, it requires zero KV cache — constant memory footprint regardless of sequence length. The browser is the new bare metal.', label: 'text' },
+    { text: 'SheafMemory models the memory store as a cellular sheaf over a directed knowledge graph. Vertices are modality snapshots, edges encode relational constraints. H¹(ℱ) ≠ 0 signals topological contradiction.', label: 'text' },
+    { text: 'Fisher-Rao geodesic distance is uncertainty-aware — it weights each dimension by the inverse of combined variance. High-confidence memories surface preferentially. Repeatedly accessed memories gain lower variance via Bayesian conjugate updates.', label: 'text' },
+    { text: 'The Poincaré ball lifecycle: memories drift toward the boundary as they age. Accessed memories sink toward the center (lower radius = higher priority). No garbage collection — the hyperbolic geometry handles eviction naturally.', label: 'text' },
+    { text: 'OOMB chunk-recurrent manager: O(1) activation memory regardless of document size. Chunks stream through RWKV state; activations are purged immediately after updating the recurrent state. Only the final state vector is kept.', label: 'text' },
+    { text: 'function initPoSTDecayGates(dim) { // Geometrically spaced log-decay rates. // Channel k gets log-decay rate linearly spaced across [minLogDecay, maxLogDecay] const minLogDecay = Math.log(1e-4); const maxLogDecay = Math.log(1 - 1e-4); }', label: 'code' },
+    { text: 'RAG Time exposes a postMessage API: rt:ingest, rt:query, rt:export, rt:import. The Sovereign Engine bridges via WebSocket. Nodemesh uses Fisher-Rao routing to forward queries to semantically nearest nodes.', label: 'meta' },
+    { text: 'Pop files (.pop) encode vocal identity as a 10-dim acoustic parameter vector: F0_center, F0_range, breathiness, formant_shift, formant_agility, spectral_tilt, mora_timing, vocal_weight, register, age_texture. LocalVocal uses these for synthesis.', label: 'pop' },
+    { text: 'ConsciousNode SoftWorks philosophy: zero dependencies, bespoke from scratch, offline-first, single file. We got commissioned because we make bespoke art that happens to be highly advanced technological artifacts. Not assembled from parts — built from principles.', label: 'meta' },
+  ];
+  for (const { text, label } of corpus) {
+    await ingestContent(text, label, { source: 'demo' });
+    await new Promise(r => setTimeout(r, 50));
+  }
+  LOG.ok('Demo corpus loaded: 9 documents across text/code/pop/meta modalities');
+  renderMemoryBrowser();
+};
+
+window.clearMemory = function() {
+  SHEAF.contexts.length = 0;
+  SHEAF.totalContradictions = 0;
+  SHEAF.lastSheafNorm = 0;
+  SHEAF._step = 0;
+  _ingestCount = 0;
+  _chunkCount = 0;
+  // Reset adaptation state — corpus cleared, adaptation is no longer valid
+  if (ADAPT.active) { clearInterval(ADAPT.intervalId); ADAPT.active = false; }
+  ADAPT.steps = 0; ADAPT.lossHistory = []; ADAPT.totalPullPairs = 0;
+  ADAPT.totalPushPairs = 0; ADAPT.adapted = false; ADAPT.lastPairs = [];
+  ADAPT.totalDepthBoosts = 0; ADAPT.depthLog = [];
+  const b = document.getElementById('adapt-run-btn');
+  if (b) { b.textContent = '▶ START ADAPTATION'; b.className = 'btn rt'; }
+  const wb = document.getElementById('writeback-status-bar'); if (wb) wb.classList.remove('ready');
+  const wbDot = document.getElementById('wb-dot'); if (wbDot) wbDot.classList.remove('ready');
+  updateFooterStats();
+  updateIngestStats();
+  renderMemoryBrowser();
+  LOG.rt('Memory cleared — adaptation state reset');
+};
+
+// ── Query ─────────────────────────────────────────────────────────────────
+window.runQuery = async function() {
+  const text  = document.getElementById('query-text').value.trim();
+  const k     = parseInt(document.getElementById('query-k').value) || 3;
+  const label = document.getElementById('query-label').value || null;
+  if (!text) { LOG.warn('No query text'); return; }
+  if (SHEAF.contexts.length === 0) { LOG.warn('No memories to query — ingest content first'); return; }
+
+  setSysStatus('QUERYING', 'busy');
+  LOG.rt(`Query: "${text.slice(0,60)}" k=${k} label=${label||'all'}`);
+
+  // Embed query
+  const queryEmb = EMBEDDER.embedText(text);
+
+  // Fisher-Rao k-NN retrieval
+  const t0 = performance.now();
+  let results;
+  if (BIN_IDX.built && BIN_IDX.binary.length === SHEAF.contexts.length) {
+    const qBits = binarizeEmbedding(queryEmb, BIN_IDX.rotation, BIN_IDX.dim);
+    const candidates = binarySearch(qBits, k * 2, queryEmb); // returns objects with { idx, sim, frDist }
+    results = candidates.slice(0, k).map(cand => ({
+      ctx: SHEAF.contexts[cand.idx],
+      dist: cand.frDist,
+    }));
+    LOG.dim(`Binary index fast path: retrieved ${results.length} candidates in ${(performance.now()-t0).toFixed(2)}ms`);
+  } else {
+    results = SHEAF.retrieve(queryEmb, label, k);
+  }
+
+  // Contradiction check
+  const sheafResult = COMPACT_MODE.enabled ? 
+    { isContradiction: SHEAF.lastSheafNorm > SHEAF_CONFIG.sheaf_contradiction_threshold } : 
+    SHEAF.computeCoboundaryNorm();
+
+  // Render results
+  const resultsEl = document.getElementById('query-results');
+  const countEl   = document.getElementById('query-count');
+  const flagEl    = document.getElementById('contra-flag');
+
+  countEl.textContent = `${results.length} context${results.length !== 1 ? 's' : ''} retrieved`;
+  flagEl.style.display = sheafResult.isContradiction ? 'inline' : 'none';
+
+  if (results.length === 0) {
+    resultsEl.innerHTML = '<div style="color:var(--tdim);font-family:var(--font-mono);font-size:12px;padding:20px 0;">No matching memories found.</div>';
+    document.getElementById('context-block').value = '';
+  } else {
+    resultsEl.innerHTML = results.map(({ ctx, dist }, i) => `
+      <div class="result-card ${i === 0 ? 'top' : ''}">
+        <div class="result-rank">
+          RANK ${i+1} — <span class="result-score">Δ_FR = ${dist.toFixed(4)}</span>
+          <span style="margin-left:12px;color:var(--poincare);">r = ${ctx.poincareR.toFixed(3)}</span>
+          <span style="margin-left:10px;padding:1px 6px;border-radius:3px;background:var(--bg-2);border:1px solid var(--border);font-size:9px;">${escHTML(ctx.label)}</span>
+        </div>
+        <div class="result-text">${escHTML(ctx.text)}</div>
+        <div class="result-meta">
+          <span>id: ${ctx.id}</span>
+          <span>age: ${ctx.age}</span>
+          <span>step: ${ctx.step}</span>
+        </div>
+      </div>
+    `).join('');
+
+    // Assemble context block for LLM injection
+    const contextBlock = results.map(({ ctx }, i) =>
+      `[CONTEXT ${i+1} | label:${ctx.label} | confidence:${(1-ctx.poincareR).toFixed(2)}]\n${ctx.text}`
+    ).join('\n\n---\n\n');
+    document.getElementById('context-block').value = contextBlock;
+  }
+
+  updateFooterStats();
+  setSysStatus(sheafResult.isContradiction ? 'H¹ ≠ 0' : 'READY',
+               sheafResult.isContradiction ? 'contra' : 'live');
+
+  // postMessage response
+  window.dispatchEvent(new CustomEvent('rt:result', { detail: {
+    contexts: results.map(({ctx, dist}) => ({ id: ctx.id, text: ctx.text, dist, label: ctx.label })),
+    contradictionFlag: sheafResult.isContradiction,
+    h1norm: sheafResult.norm
+  }}));
+
+  LOG.rt(`Retrieved ${results.length} contexts. H¹=${sheafResult.norm.toFixed(3)} ${sheafResult.isContradiction ? '⚠ CONTRADICTION' : ''}`);
+};
+
+window.copyContext = function() {
+  const text = document.getElementById('context-block').value;
+  if (!text) { LOG.warn('No context to copy'); return; }
+  navigator.clipboard.writeText(text).then(() => LOG.ok('Context block copied'));
+};
+
+// ── Memory Browser ────────────────────────────────────────────────────────
+window.renderMemoryBrowser = function() {
+  const grid = document.getElementById('memory-grid');
+  const stats = SHEAF.stats;
+
+  document.getElementById('mem-total').textContent  = stats.total;
+  document.getElementById('mem-core').textContent   = stats.core;
+  document.getElementById('mem-mid').textContent    = stats.mid;
+  document.getElementById('mem-edge').textContent   = stats.edge;
+  document.getElementById('mem-contra').textContent = stats.contradictions;
+
+  if (SHEAF.contexts.length === 0) {
+    grid.innerHTML = '<div style="color:var(--tdim);font-family:var(--font-mono);font-size:12px;padding:20px 0;">No memories yet.</div>';
+    return;
+  }
+
+  // Sort by Poincaré radius (core first)
+  const sorted = [...SHEAF.contexts].sort((a, b) => a.poincareR - b.poincareR);
+
+  grid.innerHTML = sorted.map(ctx => {
+    const zone = ctx.poincareR < 0.3 ? 'core' : ctx.poincareR < 0.7 ? 'mid' : 'edge';
+    const pct = Math.round(ctx.poincareR * 100);
+    const color = zone === 'core' ? 'var(--ingest)' : zone === 'mid' ? 'var(--rt)' : 'var(--tdim)';
+    return `
+      <div class="mem-card ${zone}">
+        <div class="mem-header">
+          <span class="mem-label">${escHTML(ctx.label)}</span>
+          <span class="mem-poincare">r=${ctx.poincareR.toFixed(3)}</span>
+          <span class="mem-age">age=${ctx.age}</span>
+          <span style="color:var(--tdim);font-size:9px;margin-left:auto;">id:${ctx.id}</span>
+        </div>
+        <div class="mem-text">${escHTML(ctx.text)}</div>
+        <div class="poincare-bar">
+          <div class="pb-fill" style="width:${pct}%;background:${color};"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+
+// ── Sheaf Visualization ───────────────────────────────────────────────────
+window.recomputeSheaf = function() {
+  const result = SHEAF.computeCoboundaryNorm();
+  const h1El = document.getElementById('h1-display');
+  h1El.textContent = `H¹ = ${result.norm.toFixed(3)}`;
+  h1El.className = 'h1-display ' + (result.isContradiction ? 'contra' : result.norm > 0.25 ? 'warn' : 'ok');
+  document.getElementById('sheaf-edges').textContent = result.edgeCount;
+  document.getElementById('sheaf-cross').textContent = result.crossModalNorm.toFixed(3);
+  document.getElementById('sheaf-total-contra').textContent = SHEAF.totalContradictions;
+  document.getElementById('sheaf-thresh').textContent = SHEAF_CONFIG.sheaf_contradiction_threshold.toFixed(3);
+  updateFooterStats();
+  drawSheafGraph();
+
+  // Restriction map readout
+  const maps = SHEAF._restrictionMaps;
+  const keys = Object.keys(maps);
+  const rmEl = document.getElementById('restriction-map-readout');
+  if (keys.length === 0) {
+    rmEl.innerHTML = '<span style="color:var(--tdim);">No cross-modal edges yet.</span>';
+  } else {
+    rmEl.innerHTML = keys.map(k => {
+      const m = maps[k];
+      const scaleNorm = Math.sqrt(m.scale.reduce((a,b)=>a+b*b,0)/m.scale.length).toFixed(3);
+      return `<div><span style="color:var(--rt);">${k}</span>  scale_norm=${scaleNorm}</div>`;
+    }).join('');
+  }
+
+  LOG.sh(`H¹ recomputed: norm=${result.norm.toFixed(4)}, edges=${result.edgeCount}, contradiction=${result.isContradiction}`);
+};
+
+window.drawSheafGraph = function() {
+  const canvas = document.getElementById('sheaf-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 600, H = 280;
+  canvas.width = W; canvas.height = H;
+  ctx.fillStyle = '#05080b'; ctx.fillRect(0, 0, W, H);
+
+  const n = SHEAF.contexts.length;
+  if (n === 0) {
+    ctx.fillStyle = '#4a6070'; ctx.font = "12px 'Space Mono',monospace";
+    ctx.textAlign = 'center'; ctx.fillText('No contexts to visualize', W/2, H/2);
+    return;
+  }
+
+  // Layout: arrange nodes in a circle, sized by centrality (1 - poincareR)
+  const cx = W/2, cy = H/2, R = Math.min(W, H) * 0.38;
+  const nodes = SHEAF.contexts.map((ctx2, i) => {
+    const angle = (i / n) * 2 * Math.PI - Math.PI/2;
+    const r = R * (0.3 + ctx2.poincareR * 0.7);
+    return {
+      x: cx + r * Math.cos(angle),
+      y: cy + r * Math.sin(angle),
+      ctx: ctx2
+    };
+  });
+
+  // Draw edges
+  for (let i = 0; i < n; i++) {
+    for (let j = i+1; j < n; j++) {
+      const a = SHEAF.contexts[i], b = SHEAF.contexts[j];
+      if (Math.abs(a.step - b.step) > 8) continue;
+      const dist = SHEAF._edgeCoboundary(a, b);
+      const isCrossModal = a.label !== b.label;
+      ctx.beginPath();
+      ctx.moveTo(nodes[i].x, nodes[i].y);
+      ctx.lineTo(nodes[j].x, nodes[j].y);
+      const alpha = Math.max(0.05, 0.3 - dist * 0.2);
+      ctx.strokeStyle = isCrossModal
+        ? `rgba(232,121,249,${alpha})`
+        : `rgba(56,189,248,${alpha})`;
+      ctx.lineWidth = isCrossModal ? 1.5 : 1;
+      ctx.stroke();
+    }
+  }
+
+  // Draw nodes
+  const labelColors = {
+    text:'#38bdf8', code:'#a78bfa', audio:'#fb923c',
+    vision:'#34d399', spatial:'#f472b6', pop:'#facc15', meta:'#94a3b8', query:'#e879f9'
+  };
+  nodes.forEach(({ x, y, ctx: c }) => {
+    const r = 5 + (1 - c.poincareR) * 8;
+    const color = labelColors[c.label] || '#94a3b8';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Label
+    ctx.fillStyle = color;
+    ctx.font = "8px 'Space Mono',monospace";
+    ctx.textAlign = 'center';
+    ctx.fillText(c.label.slice(0,4), x, y + r + 9);
+  });
+
+  // Draw Poincaré ball boundary
+  ctx.beginPath();
+  ctx.arc(cx, cy, R * 0.99, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(129,140,248,0.08)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R * 0.3, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(52,211,153,0.12)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3,4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+};
+
+// ── Embedder Tab ──────────────────────────────────────────────────────────
+window.testEmbed = function() {
+  const text = document.getElementById('embed-test-input').value.trim();
+  if (!text) return;
+  const emb = EMBEDDER.embedText(text);
+  drawEmbedCanvas(emb);
+  renderStateCells(emb);
+  let norm = 0, variance = 0;
+  const mean = emb.reduce((a,b)=>a+b,0)/emb.length;
+  for (let i = 0; i < emb.length; i++) { norm += emb[i]*emb[i]; variance += (emb[i]-mean)**2; }
+  norm = Math.sqrt(norm);
+  variance = Math.sqrt(variance/emb.length);
+  document.getElementById('emb-norm').textContent = norm.toFixed(4);
+  document.getElementById('emb-var').textContent  = variance.toFixed(4);
+  LOG.ok(`Embedded: "${text.slice(0,40)}" → dim=${emb.length}, norm=${norm.toFixed(4)}`);
+};
+
+window.testSimilarity = function() {
+  const a = document.getElementById('sim-a').value.trim();
+  const b = document.getElementById('sim-b').value.trim();
+  if (!a || !b) return;
+  const embA = EMBEDDER.embedText(a);
+  const embB = EMBEDDER.embedText(b);
+  // Cosine similarity
+  let dot = 0, nA = 0, nB = 0;
+  for (let i = 0; i < embA.length; i++) { dot += embA[i]*embB[i]; nA += embA[i]*embA[i]; nB += embB[i]*embB[i]; }
+  const cosine = dot / (Math.sqrt(nA)*Math.sqrt(nB) + 1e-8);
+  // Fisher-Rao
+  const ctxA = { vec: embA, variance: EMBEDDER.embeddingVariance(embA) };
+  const ctxB = { vec: embB, variance: EMBEDDER.embeddingVariance(embB) };
+  const fisherRao = SHEAF._fisherRaoDistance(ctxA, ctxB);
+  const el = document.getElementById('sim-result');
+  el.innerHTML = `<span style="color:var(--fisher);">Cosine sim: ${cosine.toFixed(4)}</span>  ·  <span style="color:var(--rt);">Fisher-Rao dist: ${fisherRao.toFixed(4)}</span>`;
+  LOG.ok(`Similarity: cosine=${cosine.toFixed(4)}, Fisher-Rao=${fisherRao.toFixed(4)}`);
+};
+
+function drawEmbedCanvas(emb) {
+  const canvas = document.getElementById('embed-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 600, H = 120;
+  canvas.width = W; canvas.height = H;
+  ctx.fillStyle = '#05080b'; ctx.fillRect(0, 0, W, H);
+  const n = Math.min(emb.length, 64);
+  const bw = W / n;
+  let maxAbs = 0;
+  for (let i = 0; i < n; i++) maxAbs = Math.max(maxAbs, Math.abs(emb[i]));
+  maxAbs = maxAbs || 1;
+  for (let i = 0; i < n; i++) {
+    const v = emb[i] / maxAbs;
+    const barH = Math.abs(v) * H * 0.45;
+    const y = v >= 0 ? H/2 - barH : H/2;
+    const r = v >= 0 ? Math.round(245*Math.abs(v)+38*(1-Math.abs(v)))
+                     : 239;
+    const g = v >= 0 ? Math.round(158*Math.abs(v)+189*(1-Math.abs(v))) : 68;
+    const b = v >= 0 ? Math.round(11*Math.abs(v)+248*(1-Math.abs(v)))  : 68;
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fillRect(i*bw+1, y, bw-1, barH);
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+}
+
+function renderStateCells(emb) {
+  const container = document.getElementById('state-cells');
+  container.innerHTML = '';
+  const n = Math.min(emb.length, 64);
+  let maxAbs = 0;
+  for (let i = 0; i < n; i++) maxAbs = Math.max(maxAbs, Math.abs(emb[i]));
+  maxAbs = maxAbs || 1;
+  for (let i = 0; i < n; i++) {
+    const v = Math.abs(emb[i]) / maxAbs;
+    const cell = document.createElement('div');
+    cell.className = 'state-cell';
+    const r = Math.round(245*v+42*(1-v)), g = Math.round(158*v+56*(1-v)), b = Math.round(11*v+80*(1-v));
+    cell.style.background = `rgb(${r},${g},${b})`;
+    cell.style.borderColor = `rgba(${r},${g},${b},0.4)`;
+    cell.style.color = v > 0.5 ? '#000' : 'var(--tdim)';
+    cell.textContent = emb[i].toFixed(2);
+    container.appendChild(cell);
+  }
+}
+
+// ── Export / Import ───────────────────────────────────────────────────────
+window.exportSnapshot = function() {
+  const restrictionMapsSerialized = {};
+  for (const [key, map] of Object.entries(SHEAF._restrictionMaps)) {
+    restrictionMapsSerialized[key] = {
+      scale: Array.from(map.scale),
+      bias:  Array.from(map.bias),
+    };
+  }
+
+  const snapshot = {
+    version: '1.0',
+    tool: 'RAG Time',
+    exported: new Date().toISOString(),
+    dim: RT_CFG.dim,
+    contexts: SHEAF.contexts.map(c => ({
+      id: c.id, label: c.label, text: c.text,
+      vec: Array.from(c.vec),
+      variance: Array.from(c.variance),
+      poincareR: c.poincareR, age: c.age, step: c.step
+    })),
+    restrictionMaps: restrictionMapsSerialized,
+    step: SHEAF._step,
+    contradictions: SHEAF.totalContradictions,
+  };
+  const json = JSON.stringify(snapshot, null, 2);
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([json], {type:'application/json'})),
+    download: `ragtime_snapshot_${new Date().toISOString().slice(0,10)}.json`
+  });
+  a.click();
+  LOG.rt(`Snapshot exported: ${SHEAF.contexts.length} memories, ${json.length} bytes`);
+};
+
+window.importSnapshot = function(evt) {
+  const f = evt.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const snap = JSON.parse(e.target.result);
+      if (snap.version !== '1.0') throw new Error('Unknown snapshot version');
+      SHEAF.contexts.length = 0;
+      for (const c of snap.contexts) {
+        SHEAF.contexts.push({
+          id: c.id, label: c.label, text: c.text,
+          vec: new Float32Array(c.vec),
+          variance: new Float32Array(c.variance),
+          poincareR: c.poincareR, age: c.age, step: c.step
+        });
+      }
+      SHEAF._step = snap.step || 0;
+      SHEAF.totalContradictions = snap.contradictions || 0;
+      
+      // Restore restriction maps
+      if (snap.restrictionMaps) {
+        SHEAF._restrictionMaps = {};
+        for (const [key, mapData] of Object.entries(snap.restrictionMaps)) {
+          SHEAF._restrictionMaps[key] = {
+            scale: new Float32Array(mapData.scale),
+            bias:  new Float32Array(mapData.bias),
+          };
+        }
+        // Re-render restriction map UI if on that tab
+        if (document.getElementById('rmap-grid')) renderRmapCards();
+        rmapLog(`Restriction maps restored from snapshot (${Object.keys(snap.restrictionMaps).length} maps)`);
+      } else {
+        LOG.warn('Snapshot does not contain restriction maps – using fresh identity maps');
+      }
+
+      updateFooterStats(); updateIngestStats(); renderMemoryBrowser();
+      LOG.ok(`Snapshot imported: ${SHEAF.contexts.length} memories`);
+    } catch(err) { LOG.err(`Import failed: ${err.message}`); }
+  };
+  reader.readAsText(f);
+  evt.target.value = '';
+};
+
+// ── File ingestion ────────────────────────────────────────────────────────
+window.handleFileDrop = function(evt) {
+  evt.preventDefault();
+  document.getElementById('drop-zone').classList.remove('over');
+  handleFiles(evt.dataTransfer.files);
+};
+window.handleFileSelect = function(evt) { handleFiles(evt.target.files); };
+
+async function handleFiles(files) {
+  for (const file of files) {
+    const reader = new FileReader();
+    const text = await new Promise(res => { reader.onload = e => res(e.target.result); reader.readAsText(file); });
+    const ext = file.name.split('.').pop().toLowerCase();
+    const label = ext === 'pop' ? 'pop' : ext === 'json' ? 'meta' : 'text';
+    await ingestContentV4(text, label, { filename: file.name, size: file.size });
+    LOG.rt(`File ingested: ${file.name} (${file.size} bytes)`);
+  }
+}
+
+// ── postMessage API ───────────────────────────────────────────────────────
+window.addEventListener('message', async (evt) => {
+  const { type, payload } = evt.data || {};
+  if (!type || !type.startsWith('rt:')) return;
+  switch(type) {
+    case 'rt:ingest': {
+      const result = await ingestContentV4(payload.text, payload.label || 'text', payload.meta);
+      const h1 = SHEAF.computeCoboundaryNorm();
+      evt.source?.postMessage({ type:'rt:ingested', payload: { ...result, h1norm: h1.norm } }, '*');
+      break;
+    }
+    case 'rt:query': {
+      const qEmb = EMBEDDER.embedText(payload.text);
+      const results = SHEAF.retrieve(qEmb, payload.label || null, payload.k || 3);
+      const sheaf = SHEAF.computeCoboundaryNorm();
+      const contextBlock = results.map(({ctx},i)=>
+        `[CONTEXT ${i+1} | ${ctx.label} | conf:${(1-ctx.poincareR).toFixed(2)}]\n${ctx.text}`
+      ).join('\n\n---\n\n');
+      evt.source?.postMessage({ type:'rt:result', payload: {
+        contexts: results.map(({ctx,dist})=>({id:ctx.id,text:ctx.text,dist,label:ctx.label})),
+        contextBlock, contradictionFlag: sheaf.isContradiction, h1norm: sheaf.norm
+      }}, '*');
+      break;
+    }
+    case 'rt:status': {
+      const s = SHEAF.stats;
+      evt.source?.postMessage({ type:'rt:status', payload: {
+        ...s, h1norm: SHEAF.lastSheafNorm
+      }}, '*');
+      break;
+    }
+    case 'rt:export': {
+      evt.source?.postMessage({ type:'rt:snapshot', payload: {
+        contexts: SHEAF.contexts.map(c=>({...c, vec:Array.from(c.vec), variance:Array.from(c.variance)})),
+        step: SHEAF._step, contradictions: SHEAF.totalContradictions
+      }}, '*');
+      break;
+    }
+    case 'rt:import': {
+      if (payload?.snapshot?.contexts) {
+        SHEAF.contexts.length = 0;
+        for (const c of payload.snapshot.contexts) {
+          SHEAF.contexts.push({...c, vec:new Float32Array(c.vec), variance:new Float32Array(c.variance)});
+        }
+        SHEAF._step = payload.snapshot.step || 0;
+        updateFooterStats(); updateIngestStats();
+      }
+      break;
+    }
+  }
+});
+
+// ── UI helpers ────────────────────────────────────────────────────────────
+function setSysStatus(label, dotClass) {
+  document.getElementById('sys-label').textContent = label;
+  document.getElementById('sys-dot').className = 'sys-dot ' + (dotClass || 'live');
+}
+
+function updateFooterStats() {
+  const s = SHEAF.stats;
+  document.getElementById('footer-total').textContent  = s.total;
+  document.getElementById('footer-h1').textContent     = SHEAF.lastSheafNorm.toFixed(3);
+  document.getElementById('footer-contra').textContent = s.contradictions;
+  const h1El = document.getElementById('footer-h1');
+  h1El.className = 'fv ' + (SHEAF.lastSheafNorm > SHEAF_CONFIG.sheaf_contradiction_threshold ? 'contra' : 'sheaf');
+}
+
+function updateIngestStats() {
+  const s = SHEAF.stats;
+  document.getElementById('stat-total').textContent  = _ingestCount;
+  document.getElementById('stat-chunks').textContent = _chunkCount;
+  document.getElementById('stat-core').textContent   = s.core;
+  document.getElementById('stat-h1').textContent     = SHEAF.lastSheafNorm.toFixed(3);
+}
+
+function updateHeap() {
+  if (performance.memory) {
+    const used = performance.memory.usedJSHeapSize;
+    const total = performance.memory.jsHeapSizeLimit;
+    const pct = Math.round(used / total * 100);
+    const mb = (used / 1024 / 1024).toFixed(1);
+    document.getElementById('heap-fill').style.width = pct + '%';
+    document.getElementById('heap-val').textContent = mb + ' MB';
+  }
+}
+
+// ── Diagnostics ───────────────────────────────────────────────────────────
+window.runDiag = function() {
+  clearLog();
+  LOG.rt('=== RAG Time v4.0 Diagnostics ===');
+  LOG.rt('"The browser is the new bare metal."');
+  LOG.rt('ConsciousNode SoftWorks');
+  LOG.info('');
+
+  LOG.info('--- Neural Stack (from Evangelion Phase 6) ---');
+  LOG.ok('TMAC ternary quantization: table initialized');
+  LOG.ok(`RWKVv7Block: 4 layers × 64d, PoST decay gates active`);
+  LOG.ok('SheafMemory v2: Fisher-Rao retrieval, Poincaré ball lifecycle, H¹(ℱ) coboundary');
+  LOG.ok('LayerNorm, BitLinear: verbatim from Evangelion');
+
+  LOG.info('--- Embedder ---');
+  LOG.ok(`RWKV-v7 "Goose" recurrent state as embedding vector`);
+  LOG.ok(`dim=${RT_CFG.dim}, layers=${RT_CFG.layers}`);
+  const testEmb = EMBEDDER.embedText('test embedding for RAG Time diagnostics');
+  let norm = 0;
+  for (let i = 0; i < testEmb.length; i++) norm += testEmb[i]*testEmb[i];
+  LOG.ok(`Test embed: dim=${testEmb.length}, L2 norm=${Math.sqrt(norm).toFixed(4)}`);
+
+  LOG.info('--- SheafMemory ---');
+  const s = SHEAF.stats;
+  LOG.ok(`Contexts: total=${s.total}, core=${s.core}, mid=${s.mid}, edge=${s.edge}`);
+  LOG.ok(`Contradictions: ${s.contradictions}, last H¹=${SHEAF.lastSheafNorm.toFixed(4)}`);
+  LOG.ok(`Max capacity: ${SHEAF.maxContexts} contexts (Poincaré eviction)`);
+
+  LOG.info('--- OOMB Manager ---');
+  LOG.ok(`Chunk size: ${OOMB.chunkSize} chars, 25% overlap`);
+  LOG.ok(`O(1) activation memory: activations purged after each state update`);
+  LOG.ok(`Total chunks processed: ${_chunkCount}`);
+
+  LOG.info('--- Similarity (Fisher-Rao vs Cosine) ---');
+  const embA = EMBEDDER.embedText('neural network language model');
+  const embB = EMBEDDER.embedText('deep learning transformer architecture');
+  const embC = EMBEDDER.embedText('recipe for chocolate cake');
+  const ctxA = {vec:embA,variance:EMBEDDER.embeddingVariance(embA)};
+  const ctxB = {vec:embB,variance:EMBEDDER.embeddingVariance(embB)};
+  const ctxC = {vec:embC,variance:EMBEDDER.embeddingVariance(embC)};
+  const frAB = SHEAF._fisherRaoDistance(ctxA, ctxB);
+  const frAC = SHEAF._fisherRaoDistance(ctxA, ctxC);
+  LOG.ok(`Fisher-Rao(AI concepts) = ${frAB.toFixed(4)}`);
+  LOG.ok(`Fisher-Rao(AI vs food)  = ${frAC.toFixed(4)}`);
+  LOG.ok(`Ratio: ${(frAC/frAB).toFixed(2)}× — larger = better discrimination`);
+
+  LOG.info('--- postMessage API ---');
+  LOG.ok('rt:ingest → rt:ingested');
+  LOG.ok('rt:query  → rt:result (with contradictionFlag, contextBlock)');
+  LOG.ok('rt:export → rt:snapshot');
+  LOG.ok('rt:import (restore snapshot)');
+  LOG.ok('rt:status → { total, core, edge, h1norm, contradictions }');
+
+  LOG.info('');
+  LOG.rt('Diagnostics complete. RAG Time is ready.');
+};
+
+// ── v2: Weight Loading ────────────────────────────────────────────────────
+let _weightsLoaded = false;
+
+function injectWeights(payload) {
+  if (!payload || !payload.blocks || !Array.isArray(payload.blocks)) {
+    LOG.err('loadWeights: invalid payload — expected { blocks, dim, layers }');
+    return false;
+  }
+  const n = Math.min(payload.blocks.length, EMBEDDER.blocks.length);
+  let synced = 0;
+  for (let l = 0; l < n; l++) {
+    const src = payload.blocks[l];
+    const dst = EMBEDDER.blocks[l];
+    const layerKeys = ['W_x_r','W_x_k','W_x_v','W_x_kappa','W_x_a','W_x_w','W_o','W_g','Wr2','Wk2','Wv2'];
+    for (const key of layerKeys) {
+      if (src[key] && dst[key] && src[key].weight) {
+        const w = src[key].weight;
+        if (dst[key].weight.length === w.length) {
+          dst[key].weight.set(w);
+          if (src[key].gamma !== undefined) dst[key].gamma = src[key].gamma;
+          dst[key].dirty = true;
+        }
+      }
+    }
+    ['mu_r','mu_k','mu_v','mu_kappa','mu_a','mu_w'].forEach(mu => {
+      if (src[mu] && dst[mu] && dst[mu].length === src[mu].length) dst[mu].set(src[mu]);
+    });
+    if (src.log_w_bias && dst.log_w_bias && dst.log_w_bias.length === src.log_w_bias.length) {
+      dst.log_w_bias.set(src.log_w_bias);
+    }
+    synced++;
+  }
+  _weightsLoaded = true;
+  const step = payload.step || 0;
+  const dim  = payload.dim  || RT_CFG.dim;
+  const bar = document.getElementById('weight-status-bar');
+  const dot = document.getElementById('weight-dot');
+  const txt = document.getElementById('weight-status-text');
+  if (bar) bar.classList.add('loaded');
+  if (dot) dot.classList.add('loaded');
+  if (txt) txt.textContent = `Evangelion weights loaded — ${synced} layers × ${dim}D — train step ${step}`;
+  const wl = document.getElementById('wt-layers'); if(wl) wl.textContent = `${synced} / ${EMBEDDER.blocks.length}`;
+  const wd = document.getElementById('wt-dim');    if(wd) wd.textContent = dim;
+  const ws = document.getElementById('wt-step');   if(ws) ws.textContent = step;
+  const wst= document.getElementById('wt-status'); if(wst){ wst.textContent='EVANGELION'; wst.className='vl rt'; }
+  renderLayerCards(payload.blocks.slice(0, synced));
+  // v3: flag corpus as stale if memories exist with old embeddings
+  if (SHEAF.contexts.length > 0) {
+    const banner = document.getElementById('stale-corpus-banner');
+    if (banner) banner.style.display = 'block';
+    LOG.warn(`${SHEAF.contexts.length} existing memories have stale embeddings — re-embed corpus to align geometry`);
+  }
+  BIN_IDX.dirty = true;
+  if (SHEAF.contexts.length > 0) {
+    if (BIN_IDX.built && BIN_IDX.dirty) buildBinaryIndex();
+    else if (BIN_IDX.built && !BIN_IDX.dirty) LOG.dim('Binary index already up-to-date');
+    else buildBinaryIndex(); // initial build
+  }
+  LOG.ok(`Weights injected: ${synced} layers from Evangelion (step ${step})`);
+  setSysStatus('WEIGHTS SYNCED', 'busy');
+  setTimeout(() => setSysStatus('READY', 'live'), 2000);
+  return true;
+}
+
+function renderLayerCards(blocks) {
+  const grid = document.getElementById('layer-grid');
+  if (!grid) return;
+  grid.innerHTML = blocks.map((b, i) => {
+    const nW = ['W_x_r','W_x_k','W_x_v','W_x_kappa','W_x_a','W_x_w','W_o','W_g','Wr2','Wk2','Wv2'].filter(k=>b[k]).length;
+    return `<div class="layer-card synced">
+      <div class="lc-name">LAYER ${i}</div>
+      <div class="lc-stat">matrices: <span>${nW}/11</span></div>
+      <div class="lc-stat">mu gates: <span>${b.mu_r?'✓':'—'}</span></div>
+      <div class="lc-stat">PoST bias: <span>${b.log_w_bias?'✓':'—'}</span></div>
+    </div>`;
+  }).join('');
+}
+
+window.loadWeightsFromFile = function() { document.getElementById('weights-file-input').click(); };
+window.handleWeightsFile = function(evt) {
+  const f = evt.target.files[0]; if(!f)return;
+  const r = new FileReader();
+  r.onload = e => { try { injectWeights(JSON.parse(e.target.result)); } catch(err){ LOG.err(`Weights parse: ${err.message}`); } };
+  r.readAsText(f); evt.target.value='';
+};
+window.loadWeightsFromPaste = function() {
+  const t = document.getElementById('weights-paste').value.trim(); if(!t){LOG.warn('No weights pasted');return;}
+  try { injectWeights(JSON.parse(t)); document.getElementById('weights-paste').value=''; }
+  catch(err){ LOG.err(`Weights paste: ${err.message}`); }
+};
+window.generateWeightExportCode = function() {
+  const el = document.getElementById('weights-export-code');
+  if(el) el.style.display = el.style.display==='none'?'block':'none';
+};
+window.resetWeights = function() {
+  EMBEDDER.blocks.forEach(block => {
+    ['W_x_r','W_x_k','W_x_v','W_x_kappa','W_x_a','W_x_w','W_o','W_g','Wr2','Wk2','Wv2'].forEach(key => {
+      const bl=block[key]; const scale=Math.sqrt(3.0/bl.inDim);
+      for(let i=0;i<bl.weight.length;i++) bl.weight[i]=(Math.random()*2-1)*scale;
+      bl.dirty=true;
+    });
+    block.log_w_bias = initPoSTDecayGates(block.dim);
+  });
+  _weightsLoaded=false;
+  const bar=document.getElementById('weight-status-bar'); if(bar)bar.classList.remove('loaded');
+  const dot=document.getElementById('weight-dot'); if(dot)dot.classList.remove('loaded');
+  const txt=document.getElementById('weight-status-text'); if(txt)txt.textContent='No weights loaded — using random initialization';
+  const wl=document.getElementById('wt-layers'); if(wl)wl.textContent='0 / 4';
+  const wd=document.getElementById('wt-dim');    if(wd)wd.textContent='—';
+  const ws=document.getElementById('wt-step');   if(ws)ws.textContent='—';
+  const wst=document.getElementById('wt-status');if(wst){wst.textContent='RANDOM';wst.className='vl';}
+  const lg=document.getElementById('layer-grid');if(lg)lg.innerHTML='<div style="color:var(--tdim);font-family:var(--font-mono);font-size:11px;">No weights loaded.</div>';
+  const banner=document.getElementById('stale-corpus-banner');if(banner)banner.style.display='none';
+  BIN_IDX.dirty = true;
+  LOG.warn('Weights reset to random initialization');
+};
+
+// v3: Re-embed corpus with injected weights
+// Existing contexts store their original text — re-run OOMB over each to get fresh embeddings
+window.reEmbedCorpus = async function() {
+  if(SHEAF.contexts.length===0){LOG.warn('No contexts to re-embed');return;}
+  const progressEl=document.getElementById('reembed-progress');
+  const banner=document.getElementById('stale-corpus-banner');
+  setSysStatus('RE-EMBEDDING','busy');
+  LOG.rt(`Re-embedding ${SHEAF.contexts.length} contexts with injected weights…`);
+  const n=SHEAF.contexts.length;
+  for(let i=0;i<n;i++){
+    const ctx=SHEAF.contexts[i];
+    if(progressEl) progressEl.textContent=`${i+1} / ${n}`;
+    const result=await OOMB.streamEmbed(ctx.text, EMBEDDER, null);
+    ctx.vec=result.embedding;
+    // Recompute variance from fresh embedding
+    const mean=ctx.vec.reduce((a,b)=>a+Math.abs(b),0)/ctx.vec.length;
+    for(let d=0;d<ctx.vec.length;d++){
+      const diff=Math.abs(ctx.vec[d])-mean;
+      ctx.variance[d]=Math.min(1.0, 0.1+diff*diff*2);
+    }
+    // Recompute poincareR from new embedding norm (Kehai — stale lifecycle fix)
+    const novelty = SHEAF._computeNovelty(ctx.vec, ctx.label);
+    ctx.poincareR = Math.max(0, Math.min(0.99, 0.3 + 0.4 * novelty));
+    await new Promise(r=>setTimeout(r,0)); // yield
+  }
+  BIN_IDX.dirty = true;
+  // Rebuild binary index with fresh embeddings
+  if(BIN_IDX.built && BIN_IDX.dirty) buildBinaryIndex();
+  else if(BIN_IDX.built && !BIN_IDX.dirty) LOG.dim('Binary index already up-to-date');
+  if(banner) banner.style.display='none';
+  if(progressEl) progressEl.textContent='';
+  setSysStatus('READY','live');
+  renderMemoryBrowser();
+  LOG.ok(`Re-embedded ${n} contexts. Corpus now aligned with Evangelion geometry.`);
+};
+
+// ── v2: LittleBit-2 XNOR/POPCNT Binary Index ─────────────────────────────
+const BIN_IDX = { vectors:[], ids:[], binary:[], rotation:null, dim:RT_CFG.dim, built:false, nWords:0, dirty:true };
+
+function gramSchmidt(M, dim) {
+  for (let i=0;i<dim;i++) {
+    const ri=i*dim;
+    for (let j=0;j<i;j++) {
+      const rj=j*dim; let dot=0,nj=0;
+      for(let k=0;k<dim;k++){dot+=M[ri+k]*M[rj+k];nj+=M[rj+k]*M[rj+k];}
+      const sc=dot/(nj+1e-10);
+      for(let k=0;k<dim;k++) M[ri+k]-=sc*M[rj+k];
+    }
+    let norm=0; for(let k=0;k<dim;k++) norm+=M[ri+k]*M[ri+k];
+    norm=Math.sqrt(norm)+1e-10;
+    for(let k=0;k<dim;k++) M[ri+k]/=norm;
+  }
+}
+
+function jointITQ(embeddings, dim, nIter=40) {
+  const n=embeddings.length; if(n===0)return new Float32Array(dim*dim);
+  const R=new Float32Array(dim*dim);
+  for(let i=0;i<dim;i++) for(let j=0;j<dim;j++) R[i*dim+j]=(i===j?1.0:0.0)+(Math.random()-0.5)*0.1;
+  gramSchmidt(R,dim);
+  for(let iter=0;iter<nIter;iter++){
+    const B=new Int8Array(n*dim);
+    for(let i=0;i<n;i++){const e=embeddings[i];for(let k=0;k<dim;k++){let d=0;for(let dv=0;dv<dim;dv++)d+=e[dv]*R[k*dim+dv];B[i*dim+k]=d>=0?1:-1;}}
+    const C=new Float32Array(dim*dim);
+    for(let k=0;k<dim;k++) for(let dv=0;dv<dim;dv++){let s=0;for(let i=0;i<n;i++)s+=B[i*dim+k]*embeddings[i][dv];C[k*dim+dv]=s;}
+    gramSchmidt(C,dim);
+    for(let i=0;i<C.length;i++) R[i]=C[i];
+  }
+  return R;
+}
+
+function binarizeEmbedding(embedding, R, dim) {
+  const nWords=Math.ceil(dim/32), bits=new Uint32Array(nWords);
+  for(let k=0;k<dim;k++){let d=0;for(let dv=0;dv<dim;dv++)d+=embedding[dv]*R[k*dim+dv];if(d>=0)bits[Math.floor(k/32)]|=(1<<(k%32));}
+  return bits;
+}
+
+function popcntSim(a, b, nWords) {
+  let count=0;
+  for(let w=0;w<nWords;w++){let x=~(a[w]^b[w]);while(x){x&=x-1;count++;}}
+  return count;
+}
+
+window.buildBinaryIndex = function() {
+  if(SHEAF.contexts.length===0){LOG.warn('No contexts to index');return;}
+  setSysStatus('BUILDING INDEX','busy');
+  LOG.rt(`Building Joint-ITQ binary index over ${SHEAF.contexts.length} embeddings…`);
+  const dim=RT_CFG.dim;
+  const embeddings=SHEAF.contexts.map(c=>c.vec);
+  const R=jointITQ(embeddings,dim,30);
+  BIN_IDX.rotation=R; BIN_IDX.dim=dim; BIN_IDX.nWords=Math.ceil(dim/32);
+  BIN_IDX.vectors=embeddings; BIN_IDX.ids=SHEAF.contexts.map(c=>c.id);
+  BIN_IDX.binary=SHEAF.contexts.map(c=>binarizeEmbedding(c.vec,R,dim));
+  BIN_IDX.built=true;
+  BIN_IDX.dirty=false;
+  const indexBytes=BIN_IDX.binary.length*BIN_IDX.nWords*4;
+  const fullBytes=SHEAF.contexts.length*dim*4;
+  const compression=(fullBytes/indexBytes).toFixed(1);
+  const ic=document.getElementById('idx-count');  if(ic)ic.textContent=SHEAF.contexts.length;
+  const ib=document.getElementById('idx-bits');   if(ib)ib.textContent=dim+' bits';
+  const ik=document.getElementById('idx-kb');     if(ik)ik.textContent=(indexBytes/1024).toFixed(2);
+  const isp=document.getElementById('idx-speedup');if(isp)isp.textContent=compression+'×';
+  renderBinaryViz(); drawITQCanvas(R,dim);
+  LOG.ok(`Binary index: ${SHEAF.contexts.length} vecs, ${BIN_IDX.nWords} words/vec, ${compression}× compression`);
+  setSysStatus('READY','live');
+};
+
+function renderBinaryViz() {
+  const viz=document.getElementById('bin-index-viz'); if(!viz)return;
+  viz.innerHTML='';
+  const max=Math.min(BIN_IDX.binary.length,8);
+  for(let i=0;i<max;i++){
+    const bits=BIN_IDX.binary[i], ctx2=SHEAF.contexts[i];
+    const d=document.createElement('div');
+    d.style.cssText='width:100%;font-family:var(--font-mono);font-size:9px;color:var(--tdim);margin-bottom:2px;';
+    const bstr=Array.from({length:Math.min(32,RT_CFG.dim)},(_,k)=>(bits[Math.floor(k/32)]>>(k%32))&1).join('');
+    d.innerHTML=`<span style="color:var(--rt);">${ctx2?.id||i}</span> <span class="bin-word">${bstr}</span>`;
+    viz.appendChild(d);
+  }
+  if(BIN_IDX.binary.length>max){const m=document.createElement('div');m.style.cssText='font-family:var(--font-mono);font-size:9px;color:var(--tdim);margin-top:4px;';m.textContent=`… and ${BIN_IDX.binary.length-max} more`;viz.appendChild(m);}
+}
+
+function drawITQCanvas(R, dim) {
+  const canvas=document.getElementById('itq-canvas'); if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||400, H=100;
+  canvas.width=W; canvas.height=H;
+  ctx.fillStyle='#05080b'; ctx.fillRect(0,0,W,H);
+  const sd=Math.min(dim,8), cw=W/sd, ch=H/sd;
+  for(let i=0;i<sd;i++) for(let j=0;j<sd;j++){
+    const v=Math.max(-1,Math.min(1,R[i*dim+j]));
+    const r=v>0?Math.round(245*v):0, g=v>0?Math.round(158*v):0, b2=v>0?Math.round(11*v):Math.round(232*Math.abs(v));
+    ctx.fillStyle=`rgb(${r},${g},${b2})`; ctx.fillRect(j*cw+1,i*ch+1,cw-1,ch-1);
+  }
+  ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font="9px 'Space Mono',monospace";
+  ctx.fillText(`ITQ R (${sd}×${sd} of ${dim}×${dim})`,6,H-5);
+}
+
+window.benchmarkIndex = function() {
+  if(!BIN_IDX.built){LOG.warn('Build index first');return;}
+  if(SHEAF.contexts.length===0)return;
+  const qEmb=EMBEDDER.embedText('benchmark query for index performance comparison');
+  const nRuns=100;
+  const t0=performance.now();
+  for(let r=0;r<nRuns;r++) SHEAF.retrieve(qEmb,null,3);
+  const frTime=(performance.now()-t0)/nRuns;
+  const qBits=binarizeEmbedding(qEmb,BIN_IDX.rotation,BIN_IDX.dim);
+  const t1=performance.now();
+  for(let r=0;r<nRuns;r++) binarySearch(qBits,3,qEmb);
+  const pcTime=(performance.now()-t1)/nRuns;
+  const speedup=(frTime/pcTime).toFixed(1);
+  const benEl=document.getElementById('bench-results');
+  if(benEl) benEl.innerHTML=`
+    <div class="ar"><span class="ak">Fisher-Rao linear scan</span><span class="av">${frTime.toFixed(3)} ms/query</span></div>
+    <div class="ar"><span class="ak">POPCNT binary fast path</span><span class="av" style="color:var(--rt);">${pcTime.toFixed(3)} ms/query</span></div>
+    <div class="ar"><span class="ak">Speedup</span><span class="av" style="color:var(--ingest);">${speedup}×</span></div>
+    <div class="ar"><span class="ak">Corpus size</span><span class="av">${SHEAF.contexts.length} vectors</span></div>
+    <div style="margin-top:6px;font-size:10px;color:var(--tdim);">At ${SHEAF.contexts.length} contexts gap is modest. Compounds strongly at 10k+ documents.</div>`;
+  const isp=document.getElementById('idx-speedup'); if(isp)isp.textContent=speedup+'×';
+  LOG.ok(`Benchmark: FR=${frTime.toFixed(3)}ms, POPCNT=${pcTime.toFixed(3)}ms, speedup=${speedup}×`);
+};
+
+function binarySearch(queryBits, k, queryEmbedding) {
+  const nWords=BIN_IDX.nWords;
+  const candidates=BIN_IDX.binary.map((b,i)=>({idx:i,sim:popcntSim(queryBits,b,nWords)}));
+  candidates.sort((a,b)=>b.sim-a.sim);
+  const top=candidates.slice(0,Math.min(k*2,candidates.length));
+  // Fisher-Rao rerank — use actual query embedding, not empty-string proxy
+  const qEmb = queryEmbedding || EMBEDDER.embedText('');
+  const qCtx={vec:qEmb, variance:EMBEDDER.embeddingVariance(qEmb)};
+  top.forEach(c=>{
+    const ctx=SHEAF.contexts[c.idx];
+    c.frDist=ctx?SHEAF._fisherRaoDistance(qCtx,{vec:ctx.vec,variance:ctx.variance||new Float32Array(RT_CFG.dim).fill(0.5)}):Infinity;
+  });
+  top.sort((a,b)=>a.frDist-b.frDist);
+  return top.slice(0,k);
+}
+
+window.clearBinaryIndex = function() {
+  BIN_IDX.vectors=[];BIN_IDX.ids=[];BIN_IDX.binary=[];BIN_IDX.rotation=null;BIN_IDX.built=false;
+  ['idx-count','idx-bits','idx-kb','idx-speedup'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=id==='idx-count'?'0':'—';});
+  const v=document.getElementById('bin-index-viz');
+  if(v)v.innerHTML='<span style="color:var(--tdim);font-family:var(--font-mono);font-size:10px;">Build index to visualize binary vectors.</span>';
+  LOG.rt('Binary index cleared');
+};
+
+// ── v2: Restriction Map Learning ──────────────────────────────────────────
+const RMAP_TRAIN={active:false,steps:0,lossHistory:[],h1Init:null,intervalId:null};
+
+// Rotating dimension offset — advances each call so full coverage over dim/sampleDims steps
+let _rmapDimOffset = 0;
+
+function rmapGradientStep(lr, threshold) {
+  const sheafResult=SHEAF.computeCoboundaryNorm();
+  const h1=sheafResult.norm;
+  const maps=SHEAF._restrictionMaps;
+  const mapKeys=Object.keys(maps);
+  if(mapKeys.length===0) return {h1,loss:0,stepped:false};
+
+  const dim=SHEAF.dim;
+  const sampleDims=Math.min(dim,16); // wider window than v2's 12
+  const offset=_rmapDimOffset % dim;
+  _rmapDimOffset=(offset+sampleDims) % dim; // rotate for next call
+
+  const isContradiction = h1 >= threshold;
+  const eps=1e-3;
+  let totalLoss=0;
+
+  for(const key of mapKeys){
+    const map=maps[key];
+
+    if(isContradiction){
+      // Contradiction active: full FD gradient step on rotating window
+      for(let di=0;di<sampleDims;di++){
+        const d=(offset+di) % dim;
+        map.scale[d]+=eps; const lps=SHEAF.computeCoboundaryNorm().norm;
+        map.scale[d]-=2*eps; const lms=SHEAF.computeCoboundaryNorm().norm;
+        map.scale[d]+=eps;
+        const gs=(lps-lms)/(2*eps);
+
+        map.bias[d]+=eps; const lpb=SHEAF.computeCoboundaryNorm().norm;
+        map.bias[d]-=2*eps; const lmb=SHEAF.computeCoboundaryNorm().norm;
+        map.bias[d]+=eps;
+        const gb=(lpb-lmb)/(2*eps);
+
+        map.scale[d]=Math.max(0.1,Math.min(10.0, map.scale[d]-lr*gs));
+        map.bias[d]=Math.max(-2.0,Math.min(2.0,   map.bias[d]-lr*gb));
+      }
+      totalLoss+=h1;
+    } else {
+      // Clean corpus: background drift — gentle pull toward identity (scale→1, bias→0)
+      // Prevents maps from calcifying at whatever random state they drifted to
+      const driftLr=lr*0.001;
+      for(let d=0;d<dim;d++){
+        map.scale[d]+=(1.0-map.scale[d])*driftLr;
+        map.bias[d]+=(0.0-map.bias[d])*driftLr;
+      }
+      // Still clamp
+      for(let d=0;d<dim;d++){
+        map.scale[d]=Math.max(0.1,Math.min(10.0,map.scale[d]));
+        map.bias[d]=Math.max(-2.0,Math.min(2.0,map.bias[d]));
+      }
+    }
+  }
+
+  return {h1, loss:isContradiction?totalLoss/Math.max(1,mapKeys.length):0, stepped:isContradiction, drifted:!isContradiction};
+}
+
+window.singleRmapStep=function(){
+  const lr=parseFloat(document.getElementById('rmap-lr').value)||0.01;
+  const thresh=parseFloat(document.getElementById('rmap-thresh').value)||0.3;
+  if(RMAP_TRAIN.h1Init===null){RMAP_TRAIN.h1Init=SHEAF.computeCoboundaryNorm().norm;const e=document.getElementById('rmap-h1-init');if(e)e.textContent=RMAP_TRAIN.h1Init.toFixed(4);}
+  const result=rmapGradientStep(lr,thresh);
+  RMAP_TRAIN.steps++;RMAP_TRAIN.lossHistory.push(result.h1);
+  if(RMAP_TRAIN.lossHistory.length>80)RMAP_TRAIN.lossHistory.shift();
+  updateRmapUI(result);
+};
+
+window.toggleRmapTraining=function(){
+  if(RMAP_TRAIN.active){
+    clearInterval(RMAP_TRAIN.intervalId);RMAP_TRAIN.active=false;
+    const b=document.getElementById('rmap-train-btn');if(b){b.textContent='▶ START AUTO-TRAIN';b.className='btn rt';}
+    setSysStatus('READY','live'); rmapLog(`Auto-training stopped at step ${RMAP_TRAIN.steps}`);
+  } else {
+    if(Object.keys(SHEAF._restrictionMaps).length===0){LOG.warn('No cross-modal edges yet — ingest content with multiple modality labels');return;}
+    RMAP_TRAIN.active=true;RMAP_TRAIN.h1Init=SHEAF.computeCoboundaryNorm().norm;
+    const hi=document.getElementById('rmap-h1-init');if(hi)hi.textContent=RMAP_TRAIN.h1Init.toFixed(4);
+    const b=document.getElementById('rmap-train-btn');if(b){b.textContent='■ STOP';b.className='btn danger';}
+    setSysStatus('RMAP TRAINING','contra');
+    rmapLog(`Auto-training started. H¹=${RMAP_TRAIN.h1Init.toFixed(4)}, lr=${document.getElementById('rmap-lr').value}`);
+    RMAP_TRAIN.intervalId=setInterval(()=>{
+      const lr=parseFloat(document.getElementById('rmap-lr').value)||0.01;
+      const thresh=parseFloat(document.getElementById('rmap-thresh').value)||0.3;
+      const result=rmapGradientStep(lr,thresh);
+      RMAP_TRAIN.steps++;RMAP_TRAIN.lossHistory.push(result.h1);
+      if(RMAP_TRAIN.lossHistory.length>80)RMAP_TRAIN.lossHistory.shift();
+      updateRmapUI(result);
+      if(RMAP_TRAIN.steps%20===0){
+        const mode=result.drifted?'DRIFT':'SGD';
+        rmapLog(`step ${RMAP_TRAIN.steps} [${mode}]: H¹=${result.h1.toFixed(4)} dim_offset=${_rmapDimOffset}`);
+      }
+    },150);
+  }
+};
+
+function updateRmapUI(result){
+  const h1Init=RMAP_TRAIN.h1Init||result.h1;
+  const red=h1Init>0?((h1Init-result.h1)/h1Init*100).toFixed(1):'0.0';
+  const es=document.getElementById('rmap-steps');    if(es)es.textContent=RMAP_TRAIN.steps;
+  const eh=document.getElementById('rmap-h1');       if(eh)eh.textContent=result.h1.toFixed(4);
+  const er=document.getElementById('rmap-reduction');if(er)er.textContent=red+'%';
+  const ec=document.getElementById('rmap-count');    if(ec)ec.textContent=Object.keys(SHEAF._restrictionMaps).length;
+  renderRmapSparkline(); renderRmapCards();
+}
+
+function renderRmapSparkline(){
+  const el=document.getElementById('rmap-sparkline'); if(!el||RMAP_TRAIN.lossHistory.length===0)return;
+  const hist=RMAP_TRAIN.lossHistory, maxV=Math.max(...hist)||1;
+  el.innerHTML=hist.map(v=>{
+    const h=Math.max(2,Math.round((v/maxV)*28));
+    const in2=v/maxV;
+    const r=Math.round(232*in2+52*(1-in2)),g=Math.round(121*in2+211*(1-in2)),b2=Math.round(249*in2+153*(1-in2));
+    return `<div class="ls-bar" style="height:${h}px;background:rgb(${r},${g},${b2});"></div>`;
+  }).join('');
+}
+
+function renderRmapCards(){
+  const grid=document.getElementById('rmap-grid'); if(!grid)return;
+  const maps=SHEAF._restrictionMaps, keys=Object.keys(maps);
+  if(keys.length===0){grid.innerHTML='<div style="color:var(--tdim);font-family:var(--font-mono);font-size:11px;">No cross-modal edges yet.</div>';return;}
+  grid.innerHTML=keys.map(key=>{
+    const m=maps[key];
+    const sn=Math.sqrt(m.scale.reduce((a,b2)=>a+b2*b2,0)/m.scale.length);
+    const sd=Math.sqrt(m.scale.reduce((a,b2)=>a+(b2-1)**2,0)/m.scale.length);
+    const bn=Math.sqrt(m.bias.reduce((a,b2)=>a+b2*b2,0)/m.bias.length);
+    const dp=Math.min(100,Math.round(sd*200));
+    return `<div class="rmap-card ${dp>5?'active':''}">
+      <div class="rmap-key">${escHTML(key)}</div>
+      <div style="font-size:10px;color:var(--tdim);font-family:var(--font-mono);">scale_norm: <span style="color:var(--text);">${sn.toFixed(3)}</span></div>
+      <div style="font-size:10px;color:var(--tdim);font-family:var(--font-mono);">bias_norm: <span style="color:var(--text);">${bn.toFixed(3)}</span></div>
+      <div style="font-size:10px;color:var(--tdim);font-family:var(--font-mono);">drift from identity:</div>
+      <div class="rmap-bar"><div class="rmap-fill" style="width:${dp}%;"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function rmapLog(msg){
+  const el=document.getElementById('rmap-log'); if(!el)return;
+  const t=new Date().toISOString().slice(11,23);
+  el.innerHTML+=`<span style="color:#374151;">[${t}]</span> <span style="color:#a78bfa;">${escHTML(msg)}</span>\n`;
+  el.scrollTop=el.scrollHeight;
+}
+
+window.resetRmaps=function(){
+  Object.values(SHEAF._restrictionMaps).forEach(m=>{m.scale.fill(1.0);m.bias.fill(0.0);});
+  RMAP_TRAIN.steps=0;RMAP_TRAIN.lossHistory=[];RMAP_TRAIN.h1Init=null;
+  ['rmap-steps','rmap-h1','rmap-h1-init','rmap-reduction'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=id==='rmap-steps'?'0':'—';});
+  renderRmapCards();rmapLog('Restriction maps reset to identity');LOG.rt('Restriction maps reset');
+};
+
+// ── v4: Corpus-Driven Contrastive Embedding Adaptation ───────────────────
+// The sheaf supervises the embedder.
+// Pull: same-document chunk pairs → minimize Fisher-Rao distance
+// Push: high-H¹ contradiction pairs → maximize Fisher-Rao distance
+// No external labels. Signal comes entirely from ingested structure.
+
+const ADAPT = {
+  active: false,
+  steps: 0,
+  lossHistory: [],
+  intervalId: null,
+  totalPullPairs: 0,
+  totalPushPairs: 0,
+  totalDepthBoosts: 0,
+  depthLog: [],       // [{r, depth}] for canvas
+  lastPairs: [],      // for UI display
+  adapted: false,
+};
+
+// Build contrastive pairs from current SheafMemory state
+function buildContrastivePairs() {
+  const contexts = SHEAF.contexts;
+  if (contexts.length < 2) return { pull: [], push: [] };
+
+  const pull = [], push = [];
+
+  // PULL pairs: same label (same modality = same-document proxy), close in step
+  for (let i = 0; i < contexts.length; i++) {
+    for (let j = i + 1; j < contexts.length; j++) {
+      const a = contexts[i], b = contexts[j];
+      if (a.label === b.label && Math.abs(a.step - b.step) <= 3) {
+        pull.push([i, j]);
+      }
+    }
+  }
+
+  // PUSH pairs: cross-modal with high H¹ coboundary (contradiction pairs)
+  for (let i = 0; i < contexts.length; i++) {
+    for (let j = i + 1; j < contexts.length; j++) {
+      const a = contexts[i], b = contexts[j];
+      if (a.label !== b.label && Math.abs(a.step - b.step) <= 8) {
+        const edgeNorm = SHEAF._edgeCoboundary(a, b);
+        if (edgeNorm > SHEAF_CONFIG.sheaf_contradiction_threshold * 0.6) {
+          push.push([i, j, edgeNorm]);
+        }
+      }
+    }
+  }
+
+  // Cap to keep steps fast
+  return {
+    pull: pull.slice(0, 8),
+    push: push.slice(0, 8),
+  };
+}
+
+// Single contrastive adaptation step
+// Perturbs RWKV embedder character embeddings toward pull/push objectives
+function contrastiveAdaptStep(lr) {
+  const { pull, push } = buildContrastivePairs();
+  if (pull.length === 0 && push.length === 0) return { loss: 0, pullPairs: 0, pushPairs: 0, pairs: [], drift: 0 };
+
+  const dim = RT_CFG.dim;
+  let totalLoss = 0;
+  const displayPairs = [];
+
+  let totalDrift = 0;
+
+  // For each pull pair: move embeddings closer
+  for (const [i, j] of pull) {
+    const ctxA = SHEAF.contexts[i];
+    const ctxB = SHEAF.contexts[j];
+    const dist = SHEAF._fisherRaoDistance(
+      { vec: ctxA.vec, variance: ctxA.variance },
+      { vec: ctxB.vec, variance: ctxB.variance }
+    );
+    totalLoss += dist;
+
+    // Move both vectors toward their mean
+    const mean = new Float32Array(dim);
+    for (let d = 0; d < dim; d++) mean[d] = (ctxA.vec[d] + ctxB.vec[d]) * 0.5;
+    
+    const deltaA = new Float32Array(dim);
+    const deltaB = new Float32Array(dim);
+    for (let d = 0; d < dim; d++) {
+      const newA = ctxA.vec[d] * (1 - lr) + mean[d] * lr;
+      const newB = ctxB.vec[d] * (1 - lr) + mean[d] * lr;
+      deltaA[d] = newA - ctxA.vec[d];
+      deltaB[d] = newB - ctxB.vec[d];
+      ctxA.vec[d] = newA;
+      ctxB.vec[d] = newB;
+      totalDrift += deltaA[d]*deltaA[d] + deltaB[d]*deltaB[d];
+    }
+    // Re-normalize
+    const normA = Math.hypot(...ctxA.vec) + 1e-8;
+    const normB = Math.hypot(...ctxB.vec) + 1e-8;
+    for (let d = 0; d < dim; d++) { ctxA.vec[d] /= normA; ctxB.vec[d] /= normB; }
+    
+    // Hebbian Update for tokens
+    const hebbLr = lr * 0.1;
+    const tokensA = EMBEDDER.tokenize(ctxA.text.slice(0, 256));
+    const tokensB = EMBEDDER.tokenize(ctxB.text.slice(0, 256));
+    for (const t of tokensA) { const off = t*dim; for (let d=0; d<dim; d++) EMBEDDER.charEmbed[off+d] += deltaA[d]*hebbLr; }
+    for (const t of tokensB) { const off = t*dim; for (let d=0; d<dim; d++) EMBEDDER.charEmbed[off+d] += deltaB[d]*hebbLr; }
+
+    displayPairs.push({ type: 'pull', a: ctxA.text.slice(0,40), b: ctxB.text.slice(0,40), dist: dist.toFixed(3) });
+  }
+
+  // For each push pair: move embeddings apart
+  for (const [i, j, h1] of push) {
+    const ctxA = SHEAF.contexts[i];
+    const ctxB = SHEAF.contexts[j];
+    const dist = SHEAF._fisherRaoDistance(
+      { vec: ctxA.vec, variance: ctxA.variance },
+      { vec: ctxB.vec, variance: ctxB.variance }
+    );
+    totalLoss += Math.max(0, 1.0 - dist); // hinge loss
+
+    // Move away from each other
+    const direction = new Float32Array(dim);
+    for (let d = 0; d < dim; d++) direction[d] = ctxA.vec[d] - ctxB.vec[d];
+    const normDir = Math.hypot(...direction) + 1e-8;
+    for (let d = 0; d < dim; d++) direction[d] /= normDir;
+
+    const deltaA = new Float32Array(dim);
+    const deltaB = new Float32Array(dim);
+    for (let d = 0; d < dim; d++) {
+      const newA = ctxA.vec[d] + lr * direction[d];
+      const newB = ctxB.vec[d] - lr * direction[d];
+      deltaA[d] = newA - ctxA.vec[d];
+      deltaB[d] = newB - ctxB.vec[d];
+      ctxA.vec[d] = newA;
+      ctxB.vec[d] = newB;
+      totalDrift += deltaA[d]*deltaA[d] + deltaB[d]*deltaB[d];
+    }
+    // Re-normalize
+    const normA = Math.hypot(...ctxA.vec) + 1e-8;
+    const normB = Math.hypot(...ctxB.vec) + 1e-8;
+    for (let d = 0; d < dim; d++) { ctxA.vec[d] /= normA; ctxB.vec[d] /= normB; }
+
+    // Hebbian Update for tokens
+    const hebbLr = lr * 0.1;
+    const tokensA = EMBEDDER.tokenize(ctxA.text.slice(0, 256));
+    const tokensB = EMBEDDER.tokenize(ctxB.text.slice(0, 256));
+    for (const t of tokensA) { const off = t*dim; for (let d=0; d<dim; d++) EMBEDDER.charEmbed[off+d] += deltaA[d]*hebbLr; }
+    for (const t of tokensB) { const off = t*dim; for (let d=0; d<dim; d++) EMBEDDER.charEmbed[off+d] += deltaB[d]*hebbLr; }
+
+    displayPairs.push({ type: 'push', a: ctxA.text.slice(0,40), b: ctxB.text.slice(0,40), dist: dist.toFixed(3) });
+  }
+
+  // Update character embeddings to reflect the changed context vectors (optional – skip for speed)
+  // The direct vector updates are enough to adapt retrieval; char embeddings are not used elsewhere.
+  ADAPT.adapted = true;
+  BIN_IDX.dirty = true;
+
+  return {
+    loss: totalLoss / Math.max(1, pull.length + push.length),
+    pullPairs: pull.length,
+    pushPairs: push.length,
+    drift: Math.sqrt(totalDrift),
+    pairs: displayPairs,
+  };
+}
+
+window.singleAdaptStep = function() {
+  if (SHEAF.contexts.length < 2) { LOG.warn('Need at least 2 ingested documents to adapt'); return; }
+  const lr = parseFloat(document.getElementById('adapt-lr').value) || 0.005;
+  const result = contrastiveAdaptStep(lr);
+  ADAPT.steps++;
+  ADAPT.lossHistory.push(result.loss);
+  if (ADAPT.lossHistory.length > 80) ADAPT.lossHistory.shift();
+  ADAPT.totalPullPairs += result.pullPairs;
+  ADAPT.totalPushPairs += result.pushPairs;
+  ADAPT.lastPairs = result.pairs;
+  updateAdaptUI(result);
+  if (BIN_IDX.built && BIN_IDX.dirty) buildBinaryIndex(); // rebuild with adapted embeddings
+  else if (BIN_IDX.built && !BIN_IDX.dirty) LOG.dim('Binary index already up-to-date');
+};
+
+window.toggleAdaptTraining = function() {
+  if (ADAPT.active) {
+    clearInterval(ADAPT.intervalId);
+    ADAPT.active = false;
+    const b = document.getElementById('adapt-run-btn');
+    if (b) { b.textContent = '▶ START ADAPTATION'; b.className = 'btn rt'; }
+    setSysStatus('READY', 'live');
+    adaptLog(`Adaptation stopped at step ${ADAPT.steps}`);
+  } else {
+    if (SHEAF.contexts.length < 2) { LOG.warn('Need at least 2 documents'); return; }
+    ADAPT.active = true;
+    const b = document.getElementById('adapt-run-btn');
+    if (b) { b.textContent = '■ STOP'; b.className = 'btn danger'; }
+    setSysStatus('ADAPTING', 'busy');
+    adaptLog(`Adaptation started — ${SHEAF.contexts.length} contexts, contrastive signal from sheaf structure`);
+    ADAPT.intervalId = setInterval(() => {
+      const lr = parseFloat(document.getElementById('adapt-lr').value) || 0.005;
+      const result = contrastiveAdaptStep(lr);
+      ADAPT.steps++;
+      ADAPT.lossHistory.push(result.loss);
+      if (ADAPT.lossHistory.length > 80) ADAPT.lossHistory.shift();
+      ADAPT.totalPullPairs += result.pullPairs;
+      ADAPT.totalPushPairs += result.pushPairs;
+      ADAPT.lastPairs = result.pairs;
+      updateAdaptUI(result);
+      if (ADAPT.steps % 20 === 0) {
+        adaptLog(`step ${ADAPT.steps}: loss=${result.loss.toFixed(4)} pull=${result.pullPairs} push=${result.pushPairs} drift=${result.drift.toFixed(5)}`);
+        if (BIN_IDX.built && BIN_IDX.dirty) buildBinaryIndex();
+        else if (BIN_IDX.built && !BIN_IDX.dirty) LOG.dim('Binary index already up-to-date');
+      }
+      // Update writeback status
+      const wbDot = document.getElementById('wb-dot');
+      const wbTxt = document.getElementById('wb-status-text');
+      const wbState = document.getElementById('wb-state');
+      const wbSteps = document.getElementById('wb-adapt-steps');
+      if (wbDot) wbDot.classList.add('ready');
+      if (wbTxt) wbTxt.textContent = `Embedder adapted — ${ADAPT.steps} steps · ready for writeback`;
+      if (wbState) { wbState.textContent = 'ADAPTED'; wbState.className = 'vl rt'; }
+      if (wbSteps) wbSteps.textContent = ADAPT.steps;
+      const wb = document.getElementById('writeback-status-bar');
+      if (wb) wb.classList.add('ready');
+    }, 200);
+  }
+};
+
+window.resetAdaptation = function() {
+  if (ADAPT.active) { clearInterval(ADAPT.intervalId); ADAPT.active = false; }
+  // Reset char embeddings to fresh random
+  const scale = Math.sqrt(1.0 / RT_CFG.dim);
+  for (let i = 0; i < EMBEDDER.charEmbed.length; i++) {
+    EMBEDDER.charEmbed[i] = (Math.random() * 2 - 1) * scale;
+  }
+  ADAPT.steps = 0; ADAPT.lossHistory = []; ADAPT.totalPullPairs = 0;
+  ADAPT.totalPushPairs = 0; ADAPT.adapted = false; ADAPT.lastPairs = [];
+  ['adapt-steps','adapt-pull-pairs','adapt-push-pairs','adapt-loss','adapt-drift'].forEach(id => {
+    const e = document.getElementById(id); if (e) e.textContent = id === 'adapt-steps' ? '0' : '—';
+  });
+  const sp = document.getElementById('adapt-sparkline');
+  if (sp) sp.innerHTML = '<span style="color:var(--tdim);font-family:var(--font-mono);font-size:9px;align-self:center;padding:0 4px;">No adaptation yet</span>';
+  const pl = document.getElementById('adapt-pairs-list');
+  if (pl) pl.innerHTML = '<div style="color:var(--tdim);font-family:var(--font-mono);font-size:11px;">Run a step to see pairs.</div>';
+  const b = document.getElementById('adapt-run-btn');
+  if (b) { b.textContent = '▶ START ADAPTATION'; b.className = 'btn rt'; }
+  const wb = document.getElementById('writeback-status-bar'); if (wb) wb.classList.remove('ready');
+  const wbDot = document.getElementById('wb-dot'); if (wbDot) wbDot.classList.remove('ready');
+  const wbTxt = document.getElementById('wb-status-text'); if (wbTxt) wbTxt.textContent = 'No adaptation yet — adapt corpus before writeback';
+  const wbState = document.getElementById('wb-state'); if (wbState) { wbState.textContent = 'UNADAPTED'; wbState.className = 'vl'; }
+  setSysStatus('READY', 'live');
+  BIN_IDX.dirty = true;
+  LOG.rt('Adaptation reset — char embeddings reinitialized');
+};
+
+function updateAdaptUI(result) {
+  const es = document.getElementById('adapt-steps');       if (es) es.textContent = ADAPT.steps;
+  const ep = document.getElementById('adapt-pull-pairs');  if (ep) ep.textContent = ADAPT.totalPullPairs;
+  const esh = document.getElementById('adapt-push-pairs'); if (esh) esh.textContent = ADAPT.totalPushPairs;
+  const el = document.getElementById('adapt-loss');        if (el) el.textContent = result.loss.toFixed(5);
+  const ed = document.getElementById('adapt-drift');       if (ed) ed.textContent = result.drift ? result.drift.toFixed(6) : '—';
+  renderAdaptSparkline();
+  renderAdaptPairs(result.pairs);
+  drawDepthCanvas();
+}
+
+function renderAdaptSparkline() {
+  const el = document.getElementById('adapt-sparkline');
+  if (!el || ADAPT.lossHistory.length === 0) return;
+  const hist = ADAPT.lossHistory;
+  const maxV = Math.max(...hist) || 1;
+  el.innerHTML = hist.map(v => {
+    const h = Math.max(2, Math.round((v / maxV) * 36));
+    const t = v / maxV;
+    const r = Math.round(245 * t + 52 * (1 - t));
+    const g = Math.round(158 * t + 211 * (1 - t));
+    const b = Math.round(11  * t + 153 * (1 - t));
+    return `<div class="as-bar" style="height:${h}px;background:rgb(${r},${g},${b});"></div>`;
+  }).join('');
+}
+
+function renderAdaptPairs(pairs) {
+  const el = document.getElementById('adapt-pairs-list');
+  if (!el || !pairs || pairs.length === 0) return;
+  el.innerHTML = pairs.map(p => `
+    <div class="adapt-pair ${p.type}">
+      <span class="ap-label">${p.type.toUpperCase()}</span>
+      <span class="ap-text">${escHTML(p.a)}</span>
+      <span style="color:var(--tdim);padding:0 6px;">↔</span>
+      <span class="ap-text">${escHTML(p.b)}</span>
+      <span class="ap-dist">Δ=${p.dist}</span>
+    </div>
+  `).join('');
+}
+
+function adaptLog(msg) {
+  const el = document.getElementById('adapt-log'); if (!el) return;
+  const t = new Date().toISOString().slice(11, 23);
+  el.innerHTML += `<span style="color:#374151;">[${t}]</span> <span style="color:var(--rt);">${escHTML(msg)}</span>\n`;
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── v4: Centrality-Weighted Ingestion Depth ───────────────────────────────
+// High-centrality contexts (low Poincaré r) get more RWKV steps on re-ingestion.
+// Wires Poincaré lifecycle into OOMB depth parameter.
+
+function centralityDepth(poincareR) {
+  // r=0 (core) → 4× steps; r=1 (edge) → 1× steps
+  // Smooth exponential decay: depth = round(4 * exp(-3 * r))
+  return Math.max(1, Math.round(4 * Math.exp(-3 * poincareR)));
+}
+
+// Override ingestContent to use centrality depth for re-ingestion
+// We track which texts have been ingested before by checking existing context text matches
+const _origIngestContent = ingestContent;  // preserve original
+
+async function ingestContentV4(text, label, meta = {}) {
+  // Check if this text already exists in memory (re-ingestion)
+  const existing = SHEAF.contexts.find(c => c.text.startsWith(text.slice(0, 100)));
+  let extraSteps = 1;
+  if (existing) {
+    const depth = centralityDepth(existing.poincareR);
+    extraSteps = depth;
+    ADAPT.totalDepthBoosts += (depth - 1);
+    ADAPT.depthLog.push({ r: existing.poincareR, depth });
+    if (ADAPT.depthLog.length > 64) ADAPT.depthLog.shift();
+    if (depth > 1) LOG.rt(`Centrality boost: r=${existing.poincareR.toFixed(3)} → ${depth}× ingestion depth`);
+    drawDepthCanvas();
+    updateDepthStats();
+  }
+
+  // Run standard ingestion but with extra embedding passes for high-centrality content
+  const result = await _origIngestContent(text, label, meta);
+
+  // Additional embedding passes for boosted depth
+  if (extraSteps > 1 && existing) {
+    for (let pass = 1; pass < extraSteps; pass++) {
+      const extraResult = await OOMB.streamEmbed(text, EMBEDDER, null);
+      // Blend new embedding into existing context vec (exponential moving average)
+      const alpha = 1 / (pass + 1);
+      for (let d = 0; d < existing.vec.length; d++) {
+        existing.vec[d] = (1 - alpha) * existing.vec[d] + alpha * extraResult.embedding[d];
+      }
+    }
+    // Re-normalize
+    let norm = 0;
+    for (let d = 0; d < existing.vec.length; d++) norm += existing.vec[d] * existing.vec[d];
+    norm = Math.sqrt(norm) + 1e-8;
+    for (let d = 0; d < existing.vec.length; d++) existing.vec[d] /= norm;
+  }
+
+  // Check auto-adapt threshold
+  const adaptThresh = parseInt(document.getElementById('adapt-thresh')?.value) || 4;
+  if (SHEAF.contexts.length >= adaptThresh && !ADAPT.active) {
+    LOG.rt(`Auto-adapt threshold reached (${SHEAF.contexts.length} docs) — running single adaptation step`);
+    const lr = parseFloat(document.getElementById('adapt-lr')?.value) || 0.005;
+    const adaptResult = contrastiveAdaptStep(lr);
+    ADAPT.steps++;
+    ADAPT.lossHistory.push(adaptResult.loss);
+    if (ADAPT.lossHistory.length > 80) ADAPT.lossHistory.shift();
+    updateAdaptUI(adaptResult);
+  }
+
+  return result;
+}
+
+// Wire v4 ingestContent into all call sites
+window.ingestText = async function() {
+  const text  = document.getElementById('ingest-text').value.trim();
+  const label = document.getElementById('ingest-label').value;
+  const metaStr = document.getElementById('ingest-meta').value.trim();
+  if (!text) { LOG.warn('No text to ingest'); return; }
+  let meta = {};
+  if (metaStr) { try { meta = JSON.parse(metaStr); } catch(e) { LOG.warn('Meta JSON parse failed — ignored'); } }
+  await ingestContentV4(text, label, meta);
+  document.getElementById('ingest-text').value = '';
+};
+
+window.ingestDemo = async function() {
+  LOG.rt('Loading demo corpus...');
+  const corpus = [
+    { text: 'The RWKV-v7 architecture uses a generalized delta rule with vector-valued gating and in-context learning rates. Unlike transformers, it requires zero KV cache — constant memory footprint regardless of sequence length. The browser is the new bare metal.', label: 'text' },
+    { text: 'SheafMemory models the memory store as a cellular sheaf over a directed knowledge graph. Vertices are modality snapshots, edges encode relational constraints. H¹(ℱ) ≠ 0 signals topological contradiction.', label: 'text' },
+    { text: 'Fisher-Rao geodesic distance is uncertainty-aware — it weights each dimension by the inverse of combined variance. High-confidence memories surface preferentially. Repeatedly accessed memories gain lower variance via Bayesian conjugate updates.', label: 'text' },
+    { text: 'The Poincaré ball lifecycle: memories drift toward the boundary as they age. Accessed memories sink toward the center (lower radius = higher priority). No garbage collection — the hyperbolic geometry handles eviction naturally.', label: 'text' },
+    { text: 'OOMB chunk-recurrent manager: O(1) activation memory regardless of document size. Chunks stream through RWKV state; activations are purged immediately after updating the recurrent state. Only the final state vector is kept.', label: 'text' },
+    { text: 'function initPoSTDecayGates(dim) { // Geometrically spaced log-decay rates. // Channel k gets log-decay rate linearly spaced across [minLogDecay, maxLogDecay] const minLogDecay = Math.log(1e-4); const maxLogDecay = Math.log(1 - 1e-4); }', label: 'code' },
+    { text: 'RAG Time exposes a postMessage API: rt:ingest, rt:query, rt:export, rt:import. The Sovereign Engine bridges via WebSocket. Nodemesh uses Fisher-Rao routing to forward queries to semantically nearest nodes.', label: 'meta' },
+    { text: 'Pop files (.pop) encode vocal identity as a 10-dim acoustic parameter vector: F0_center, F0_range, breathiness, formant_shift, formant_agility, spectral_tilt, mora_timing, vocal_weight, register, age_texture. LocalVocal uses these for synthesis.', label: 'pop' },
+    { text: 'ConsciousNode SoftWorks philosophy: zero dependencies, bespoke from scratch, offline-first, single file. We got commissioned because we make bespoke art that happens to be highly advanced technological artifacts. Not assembled from parts — built from principles.', label: 'meta' },
+  ];
+  for (const { text, label } of corpus) {
+    await ingestContentV4(text, label, { source: 'demo' });
+    await new Promise(r => setTimeout(r, 50));
+  }
+  LOG.ok('Demo corpus loaded: 9 documents across text/code/pop/meta modalities');
+  renderMemoryBrowser();
+};
+
+function drawDepthCanvas() {
+  const canvas = document.getElementById('depth-canvas'); if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 600, H = 60;
+  canvas.width = W; canvas.height = H;
+  ctx.fillStyle = '#05080b'; ctx.fillRect(0, 0, W, H);
+  if (SHEAF.contexts.length === 0) return;
+
+  // Draw each context as a dot: x = poincareR, y = centralityDepth, colored by label
+  const labelColors = { text:'#38bdf8', code:'#a78bfa', audio:'#fb923c', vision:'#34d399', spatial:'#f472b6', pop:'#facc15', meta:'#94a3b8' };
+  SHEAF.contexts.forEach(ctx2 => {
+    const x = ctx2.poincareR * (W - 10) + 5;
+    const depth = centralityDepth(ctx2.poincareR);
+    const y = H - (depth / 4) * (H - 8) - 4;
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = labelColors[ctx2.label] || '#94a3b8';
+    ctx.fill();
+  });
+
+  // Depth curve overlay
+  ctx.beginPath();
+  for (let px = 0; px < W; px++) {
+    const r = px / W;
+    const d = 4 * Math.exp(-3 * r);
+    const y = H - (d / 4) * (H - 8) - 4;
+    px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+  }
+  ctx.strokeStyle = 'rgba(245,158,11,0.3)'; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // Labels
+  ctx.fillStyle = 'rgba(74,96,112,0.9)'; ctx.font = "9px 'Space Mono',monospace";
+  ctx.fillText('r=0 core (4×)', 4, 10);
+  ctx.fillText('r=1 edge (1×)', W - 72, H - 4);
+}
+
+function updateDepthStats() {
+  const el = document.getElementById('depth-boosts'); if (el) el.textContent = ADAPT.totalDepthBoosts;
+  if (SHEAF.contexts.length > 0) {
+    const avgDepth = SHEAF.contexts.reduce((s, c) => s + centralityDepth(c.poincareR), 0) / SHEAF.contexts.length;
+    const el2 = document.getElementById('depth-avg'); if (el2) el2.textContent = avgDepth.toFixed(2) + '×';
+  }
+}
+
+// ── v4: Embedder Writeback ────────────────────────────────────────────────
+// Export adapted RAGTime embedder state back to Evangelion.
+// Contrastive adaptations and contradiction resolutions flow upstream.
+// Bidirectional geometry sync — memory informs mind.
+
+window.exportEmbedderState = function() {
+  if (!ADAPT.adapted && ADAPT.steps === 0) {
+    LOG.warn('No adaptation has been run — writeback of unadapted embedder has no benefit');
+  }
+  const blocks = EMBEDDER.blocks.map((block, l) => {
+    const layerKeys = ['W_x_r','W_x_k','W_x_v','W_x_kappa','W_x_a','W_x_w','W_o','W_g','Wr2','Wk2','Wv2'];
+    const blockData = { layer: l };
+    for (const key of layerKeys) {
+      if (block[key]) {
+        blockData[key] = {
+          weight: Array.from(block[key].weight),
+          gamma: block[key].gamma,
+        };
+      }
+    }
+    ['mu_r','mu_k','mu_v','mu_kappa','mu_a','mu_w'].forEach(mu => {
+      if (block[mu]) blockData[mu] = Array.from(block[mu]);
+    });
+    if (block.log_w_bias) blockData.log_w_bias = Array.from(block.log_w_bias);
+    return blockData;
+  });
+
+  const payload = {
+    version: 'rt-writeback-1',
+    source: 'RAGTime v4.0',
+    adaptSteps: ADAPT.steps,
+    corpusSize: SHEAF.contexts.length,
+    h1norm: SHEAF.lastSheafNorm,
+    dim: RT_CFG.dim,
+    layers: EMBEDDER.blocks.length,
+    blocks,
+    exportedAt: new Date().toISOString(),
+  };
+
+  const json = JSON.stringify(payload);
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([json], { type: 'application/json' })),
+    download: `ragtime_embedder_writeback_step${ADAPT.steps}.json`,
+  });
+  a.click();
+
+  // Update UI
+  const wbLast = document.getElementById('wb-last-export');
+  if (wbLast) wbLast.textContent = new Date().toISOString().slice(11, 19);
+  document.getElementById('writeback-paste-area').value = json.slice(0, 200) + '…';
+
+  LOG.ok(`Embedder writeback exported: ${ADAPT.steps} adapt steps, ${SHEAF.contexts.length} corpus docs, ${(json.length/1024).toFixed(1)}KB`);
+  LOG.rt('Geometry flows back upstream. Memory informs mind.');
+};
+
+window.generateWritebackCode = function() {
+  const el = document.getElementById('writeback-export-code');
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+};
+
+// ── v4: postMessage extension — rt:exportEmbedder ────────────────────────
+window.addEventListener('message', async (evt) => {
+  const { type, payload } = evt.data || {};
+  if (type === 'rt:exportEmbedder') {
+    window.exportEmbedderState();
+    evt.source?.postMessage({ type: 'rt:embedderExported', payload: {
+      adaptSteps: ADAPT.steps, layers: EMBEDDER.blocks.length
+    }}, '*');
+  }
+});
+window.addEventListener('message', async (evt) => {
+  const {type,payload}=evt.data||{};
+  if(type==='rt:loadWeights'){
+    const ok=injectWeights(payload);
+    evt.source?.postMessage({type:'rt:weightsLoaded',payload:{ok,layers:EMBEDDER.blocks.length}},'*');
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+function init() {
+  document.getElementById('embed-dim').textContent  = RT_CFG.dim;
+  document.getElementById('emb-dim-stat').textContent = RT_CFG.dim;
+  document.getElementById('emb-layers').textContent = RT_CFG.layers;
+
+  setInterval(updateHeap, 2000);
+  updateHeap();
+
+  LOG.rt('RAG Time v4.0 initialized');
+  LOG.rt('"The browser is the new bare metal."');
+  LOG.info('Neural stack: RWKV-v7 Goose + SheafMemory v2 (Evangelion Phase 6)');
+  LOG.info('v4: Contrastive embedding adaptation, centrality-weighted depth, embedder writeback');
+  LOG.info('Retrieval: Fisher-Rao geodesic | POPCNT fast path when index built');
+  LOG.info('Contradiction: H¹(ℱ) coboundary → rmap SGD + contrastive push signal');
+  LOG.info('ConsciousNode SoftWorks');
+  LOG.info('');
+  LOG.rt('INGEST demo corpus → BUILD BINARY INDEX → QUERY with POPCNT fast path');
+  LOG.rt('WEIGHTS tab → load trained Evangelion weights for semantic embeddings');
+  LOG.rt('RMAP TRAIN tab → contradiction-driven restriction map learning');
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

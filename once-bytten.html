@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Once Bytten — Byte-Level File Security Scanner</title>
+<style>
+:root {
+  --void: #020202;
+  --deep: #070707;
+  --panel: #0e0e0e;
+  --surface: #141414;
+  --surface2: #1a1a1a;
+  --border: #1e1e1e;
+  --border2: #2a2a2a;
+  --bite: #CC1122;
+  --bite-dim: #881018;
+  --bite-bright: #FF2233;
+  --bite-glow: rgba(204,17,34,0.10);
+  --bite-glow2: rgba(204,17,34,0.20);
+  --warn: #DD7700;
+  --warn-glow: rgba(221,119,0,0.12);
+  --safe: #118833;
+  --safe-bright: #22BB55;
+  --safe-glow: rgba(17,136,51,0.12);
+  --info: #336688;
+  --info-bright: #4499BB;
+  --text: #CCCCCC;
+  --text2: #999999;
+  --text3: #555555;
+  --text4: #333333;
+  --mono: 'Courier New', Courier, monospace;
+  --risk0: #226633;
+  --risk1: #4488AA;
+  --risk2: #CC8800;
+  --risk3: #CC2211;
+  --risk4: #FF0022;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--void);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.5;overflow-x:hidden}
+body{min-height:100vh;display:flex;flex-direction:column}
+::selection{background:var(--bite-glow2);color:#fff}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--deep)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--bite-dim)}
+button{font-family:var(--mono);cursor:pointer;border:none;outline:none}
+input[type=file]{display:none}
+
+/* SCANLINES */
+body::before{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+  pointer-events:none;z-index:9999
+}
+
+/* HEADER */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;
+  border-bottom:1px solid var(--border);
+  background:var(--deep);
+  position:sticky;top:0;z-index:100
+}
+.logo{display:flex;align-items:center;gap:10px}
+.logo svg{flex-shrink:0}
+.logo-text{display:flex;flex-direction:column;gap:1px}
+.logo-title{font-size:15px;letter-spacing:0.15em;color:var(--bite);text-transform:uppercase;font-weight:bold}
+.logo-sub{font-size:9px;letter-spacing:0.2em;color:var(--text3);text-transform:uppercase}
+.header-right{display:flex;align-items:center;gap:8px}
+.btn-ghost{
+  background:transparent;color:var(--text3);
+  border:1px solid var(--border2);padding:4px 10px;
+  font-size:10px;letter-spacing:0.1em;text-transform:uppercase;
+  transition:all 0.15s
+}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2);background:var(--surface)}
+.cns-badge{font-size:9px;color:var(--text4);letter-spacing:0.1em;text-transform:uppercase}
+
+/* MAIN */
+main{flex:1;padding:20px;display:flex;flex-direction:column;gap:20px;max-width:1400px;width:100%;margin:0 auto}
+
+/* DROPZONE */
+#drop-zone{
+  border:1px dashed var(--border2);
+  background:var(--deep);
+  border-radius:2px;
+  padding:60px 40px;
+  text-align:center;
+  cursor:pointer;
+  transition:all 0.2s;
+  position:relative;
+  overflow:hidden
+}
+#drop-zone::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at center, var(--bite-glow) 0%, transparent 70%);
+  opacity:0;transition:opacity 0.3s
+}
+#drop-zone:hover::before,#drop-zone.drag-over::before{opacity:1}
+#drop-zone:hover,#drop-zone.drag-over{border-color:var(--bite-dim)}
+.drop-fangs{margin-bottom:16px;opacity:0.6;transition:opacity 0.2s}
+#drop-zone:hover .drop-fangs,#drop-zone.drag-over .drop-fangs{opacity:1}
+.drop-main{font-size:13px;color:var(--text2);letter-spacing:0.05em;margin-bottom:6px}
+.drop-sub{font-size:10px;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase}
+.drop-limit{font-size:9px;color:var(--text4);margin-top:8px;letter-spacing:0.1em}
+
+/* PROGRESS */
+#progress-zone{display:none;background:var(--deep);border:1px solid var(--border);border-radius:2px;padding:20px}
+.progress-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.progress-phase{font-size:10px;color:var(--text2);letter-spacing:0.15em;text-transform:uppercase}
+.progress-pct{font-size:10px;color:var(--bite);letter-spacing:0.1em}
+.progress-bar-bg{background:var(--surface2);height:3px;border-radius:1px;overflow:hidden;margin-bottom:12px}
+.progress-bar-fill{height:100%;background:var(--bite);border-radius:1px;transition:width 0.3s;width:0%}
+.progress-phases{display:flex;gap:6px;flex-wrap:wrap}
+.phase-pip{
+  font-size:9px;letter-spacing:0.1em;text-transform:uppercase;
+  padding:2px 8px;border:1px solid var(--border);color:var(--text4);
+  transition:all 0.2s
+}
+.phase-pip.active{border-color:var(--bite-dim);color:var(--bite);background:var(--bite-glow)}
+.phase-pip.done{border-color:var(--border2);color:var(--text3)}
+
+/* RESULTS */
+#results-zone{display:none}
+.file-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;background:var(--panel);border:1px solid var(--border);
+  margin-bottom:1px
+}
+.file-name{font-size:12px;color:var(--text);letter-spacing:0.03em}
+.file-meta{font-size:10px;color:var(--text3)}
+.file-actions{display:flex;gap:6px}
+
+/* THREAT BADGE */
+.threat-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:10px;letter-spacing:0.15em;text-transform:uppercase;
+  padding:4px 10px;border:1px solid;font-weight:bold
+}
+.threat-0{color:var(--safe-bright);border-color:var(--safe);background:var(--safe-glow)}
+.threat-1{color:var(--info-bright);border-color:var(--info);background:rgba(51,102,136,0.1)}
+.threat-2{color:var(--warn);border-color:var(--warn);background:var(--warn-glow)}
+.threat-3{color:var(--bite-bright);border-color:var(--bite);background:var(--bite-glow2)}
+.threat-4{color:#fff;border-color:var(--bite-bright);background:rgba(255,0,34,0.2);animation:pulse-red 1s infinite}
+@keyframes pulse-red{0%,100%{background:rgba(255,0,34,0.2)}50%{background:rgba(255,0,34,0.35)}}
+
+/* TABS */
+.tab-bar{display:flex;gap:1px;flex-wrap:wrap;margin-bottom:1px}
+.tab-btn{
+  background:var(--panel);color:var(--text3);
+  border:1px solid var(--border);padding:6px 14px;
+  font-size:10px;letter-spacing:0.12em;text-transform:uppercase;
+  transition:all 0.15s;border-bottom:none
+}
+.tab-btn:hover{color:var(--text2);background:var(--surface)}
+.tab-btn.active{color:var(--bite);background:var(--surface2);border-color:var(--bite-dim);border-bottom:1px solid var(--surface2)}
+.tab-panels{border:1px solid var(--border);background:var(--panel)}
+.tab-panel{display:none;padding:16px}
+.tab-panel.active{display:block}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);margin-bottom:10px}
+.card-head{
+  padding:8px 12px;border-bottom:1px solid var(--border);
+  font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--text3);
+  display:flex;justify-content:space-between;align-items:center
+}
+.card-body{padding:12px}
+
+/* OVERVIEW GRID */
+.overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:700px){.overview-grid{grid-template-columns:1fr}}
+.stat-row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;border-bottom:1px solid var(--border)}
+.stat-row:last-child{border-bottom:none}
+.stat-label{font-size:10px;color:var(--text3);letter-spacing:0.08em;text-transform:uppercase}
+.stat-val{font-size:11px;color:var(--text)}
+.findings-list{display:flex;flex-direction:column;gap:4px}
+.finding{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:6px 8px;border-left:2px solid;font-size:11px
+}
+.finding-info{border-color:var(--info)}
+.finding-warn{border-color:var(--warn)}
+.finding-crit{border-color:var(--bite)}
+.finding-safe{border-color:var(--safe)}
+
+/* MAGIC HEX DUMP */
+.hex-dump{
+  font-family:var(--mono);font-size:11px;
+  background:var(--deep);padding:10px;
+  border:1px solid var(--border);overflow-x:auto;
+  line-height:1.8
+}
+.hex-row{display:flex;gap:16px;align-items:baseline}
+.hex-offset{color:var(--text4);min-width:50px}
+.hex-bytes{color:var(--text2);letter-spacing:0.05em;flex:1}
+.hex-ascii{color:var(--text3)}
+.hex-match{color:var(--bite-bright);background:var(--bite-glow);padding:1px 2px}
+.sig-table{width:100%;border-collapse:collapse}
+.sig-table th{font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text3);text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)}
+.sig-table td{padding:6px 8px;border-bottom:1px solid var(--border);font-size:11px}
+.sig-table tr:last-child td{border-bottom:none}
+.risk-pill{display:inline-block;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border:1px solid}
+.risk-0{color:var(--risk0);border-color:var(--risk0)}
+.risk-1{color:var(--risk1);border-color:var(--risk1)}
+.risk-2{color:var(--risk2);border-color:var(--risk2)}
+.risk-3{color:var(--risk3);border-color:var(--risk3)}
+.mismatch-warn{color:var(--warn);font-size:11px;padding:8px;border:1px solid var(--warn);margin-top:8px;background:var(--warn-glow)}
+
+/* ENTROPY */
+#entropy-canvas{width:100%;height:60px;image-rendering:pixelated;border:1px solid var(--border);display:block;margin-bottom:8px}
+.entropy-legend{display:flex;gap:12px;font-size:9px;color:var(--text3);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px}
+.legend-swatch{display:inline-block;width:12px;height:10px;margin-right:4px;vertical-align:middle}
+
+/* STRINGS */
+.str-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.str-filter{
+  font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 8px;
+  border:1px solid var(--border);color:var(--text3);background:transparent;cursor:pointer;transition:all 0.15s
+}
+.str-filter.on{background:var(--bite-glow);border-color:var(--bite-dim);color:var(--bite)}
+.str-table{width:100%;border-collapse:collapse;font-size:10px}
+.str-table th{font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);text-align:left;padding:5px 8px;border-bottom:1px solid var(--border)}
+.str-table td{padding:4px 8px;border-bottom:1px solid var(--border);word-break:break-all}
+.str-table tr:last-child td{border-bottom:none}
+.str-table tr:hover td{background:var(--surface2)}
+.cat-pill{font-size:8px;letter-spacing:0.1em;text-transform:uppercase;padding:1px 5px;border:1px solid;white-space:nowrap}
+.cat-URL{color:#44AACC;border-color:#44AACC}
+.cat-IP{color:#CC8800;border-color:#CC8800}
+.cat-WIN_PATH,.cat-UNIX_PATH{color:#8888AA;border-color:#8888AA}
+.cat-REGISTRY{color:#AA6622;border-color:#AA6622}
+.cat-WIN_TOOL,.cat-CODE_EXEC{color:var(--bite-bright);border-color:var(--bite)}
+.cat-NET_TOOL{color:#CC4400;border-color:#CC4400}
+.cat-BASE64{color:#8855AA;border-color:#8855AA}
+.cat-EMAIL{color:#446688;border-color:#446688}
+.str-val{font-family:var(--mono);color:var(--text2);font-size:10px}
+.str-off{color:var(--text4)}
+.str-empty{color:var(--text3);font-size:11px;padding:16px;text-align:center}
+
+/* STRUCTURE */
+.struct-section{margin-bottom:12px}
+.struct-label{font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:var(--bite);margin-bottom:6px}
+.kv-list{display:grid;grid-template-columns:180px 1fr;gap:1px;font-size:10px}
+.kv-key{color:var(--text3);padding:3px 6px;background:var(--deep)}
+.kv-val{color:var(--text);padding:3px 6px;background:var(--surface);word-break:break-all}
+.struct-warn{color:var(--warn);font-size:10px;margin-top:4px}
+.zip-list{font-size:10px;max-height:200px;overflow-y:auto}
+.zip-entry{display:flex;justify-content:space-between;padding:3px 6px;border-bottom:1px solid var(--border)}
+.zip-name{color:var(--text2)}
+.zip-size{color:var(--text3)}
+.zip-flag{color:var(--bite-bright);font-size:9px}
+
+/* HEX VIEWER */
+.hex-viewer-controls{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.hex-pg-btn{background:var(--surface);color:var(--text2);border:1px solid var(--border);padding:4px 10px;font-size:10px;transition:all 0.15s}
+.hex-pg-btn:hover:not(:disabled){background:var(--surface2);border-color:var(--border2)}
+.hex-pg-btn:disabled{opacity:0.3;cursor:default}
+.hex-pg-info{font-size:10px;color:var(--text3)}
+.hex-search{background:var(--deep);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:10px;padding:4px 8px;outline:none;width:160px}
+.hex-search:focus{border-color:var(--bite-dim)}
+.hex-viewer-body{font-size:10px;line-height:1.9;overflow-x:auto;background:var(--deep);border:1px solid var(--border);padding:8px}
+.hvr{display:flex;gap:12px}
+.hvr-off{color:var(--text4);min-width:56px;user-select:none}
+.hvr-hex{color:var(--text2);letter-spacing:0.06em;flex:0 0 auto;width:370px}
+.hvr-asc{color:var(--text3);flex:1}
+.hvr-hl{color:var(--bite-bright);background:var(--bite-glow)}
+
+/* ROSA */
+.rosa-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
+@media(max-width:600px){.rosa-grid{grid-template-columns:1fr}}
+.rosa-metric{background:var(--deep);border:1px solid var(--border);padding:10px;text-align:center}
+.rosa-val{font-size:20px;color:var(--bite);margin-bottom:4px}
+.rosa-lbl{font-size:9px;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase}
+.bigram-canvas{width:100%;height:80px;display:block;border:1px solid var(--border);margin-bottom:8px;image-rendering:pixelated}
+
+/* DEBUG */
+#debug-zone{border-top:1px solid var(--border);margin-top:auto}
+.debug-toggle{
+  width:100%;background:var(--deep);color:var(--text3);border:none;
+  padding:8px 16px;text-align:left;font-family:var(--mono);font-size:9px;
+  letter-spacing:0.15em;text-transform:uppercase;cursor:pointer;
+  display:flex;justify-content:space-between;transition:color 0.15s
+}
+.debug-toggle:hover{color:var(--text2)}
+#debug-body{display:none;background:var(--void);border-top:1px solid var(--border);padding:12px 16px;overflow-x:auto}
+#debug-body.open{display:block}
+.debug-json{font-size:9px;color:var(--text3);white-space:pre;line-height:1.6}
+
+/* MODAL */
+#modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;
+  align-items:center;justify-content:center
+}
+#modal-overlay.open{display:flex}
+.modal{
+  background:var(--panel);border:1px solid var(--border2);max-width:560px;width:90%;
+  max-height:80vh;overflow-y:auto;position:relative
+}
+.modal-head{
+  padding:12px 16px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center
+}
+.modal-title{font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--bite)}
+.modal-close{background:transparent;color:var(--text3);font-size:16px;padding:0 4px;transition:color 0.15s}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:16px;font-size:11px;line-height:1.8;color:var(--text2)}
+.modal-section{margin-bottom:14px}
+.modal-section h3{font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.modal-section p,.modal-section li{margin-bottom:4px}
+.modal-section ul{padding-left:16px}
+.modal-section code{color:var(--bite-bright);font-family:var(--mono)}
+
+/* THREAT COLORS IN TABLES */
+.tr3 td:first-child{border-left:2px solid var(--bite)}
+.tr2 td:first-child{border-left:2px solid var(--warn)}
+.tr1 td:first-child{border-left:2px solid var(--info-bright)}
+.tr0 td:first-child{border-left:2px solid var(--safe)}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <rect x="8" y="3" width="4" height="13" rx="2" fill="#CC1122"/>
+      <rect x="16" y="3" width="4" height="13" rx="2" fill="#CC1122"/>
+      <ellipse cx="10" cy="17" rx="2.5" ry="3.5" fill="#880011"/>
+      <ellipse cx="18" cy="17" rx="2.5" ry="3.5" fill="#880011"/>
+      <circle cx="10" cy="19.5" r="1.5" fill="#CC1122" opacity="0.7"/>
+      <circle cx="18" cy="19.5" r="1.5" fill="#CC1122" opacity="0.7"/>
+    </svg>
+    <div class="logo-text">
+      <div class="logo-title">Once Bytten</div>
+      <div class="logo-sub">Byte-Level File Security Scanner</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="cns-badge">ConsciousNode SoftWorks</div>
+    <button class="btn-ghost" onclick="openHelp()">? Help</button>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main>
+
+<!-- DROP ZONE -->
+<div id="drop-zone" onclick="document.getElementById('file-input').click()">
+  <div class="drop-fangs">
+    <svg width="48" height="32" viewBox="0 0 48 32" fill="none">
+      <rect x="12" y="2" width="7" height="20" rx="3.5" fill="#CC1122" opacity="0.7"/>
+      <rect x="29" y="2" width="7" height="20" rx="3.5" fill="#CC1122" opacity="0.7"/>
+      <ellipse cx="15.5" cy="23" rx="4" ry="5.5" fill="#881018" opacity="0.8"/>
+      <ellipse cx="32.5" cy="23" rx="4" ry="5.5" fill="#881018" opacity="0.8"/>
+    </svg>
+  </div>
+  <div class="drop-main">Drop file here or click to browse</div>
+  <div class="drop-sub">Any file type — browser-native analysis — no upload</div>
+  <div class="drop-limit">Maximum file size: 200 MB</div>
+</div>
+<input type="file" id="file-input" onchange="handleFile(this.files[0])">
+
+<!-- PROGRESS -->
+<div id="progress-zone">
+  <div class="progress-header">
+    <span class="progress-phase" id="prog-phase">Initializing...</span>
+    <span class="progress-pct" id="prog-pct">0%</span>
+  </div>
+  <div class="progress-bar-bg">
+    <div class="progress-bar-fill" id="prog-bar"></div>
+  </div>
+  <div class="progress-phases">
+    <div class="phase-pip" id="pip-ingest">Ingest</div>
+    <div class="phase-pip" id="pip-magic">Magic</div>
+    <div class="phase-pip" id="pip-entropy">Entropy</div>
+    <div class="phase-pip" id="pip-strings">Strings</div>
+    <div class="phase-pip" id="pip-rosa">ROSA</div>
+    <div class="phase-pip" id="pip-struct">Structure</div>
+    <div class="phase-pip" id="pip-hex">Hex</div>
+  </div>
+</div>
+
+<!-- RESULTS -->
+<div id="results-zone">
+  <div class="file-header">
+    <div>
+      <div class="file-name" id="res-filename">—</div>
+      <div class="file-meta" id="res-meta">—</div>
+    </div>
+    <div class="file-actions">
+      <span id="res-threat"></span>
+      <button class="btn-ghost" onclick="exportReport()">⬇ Export</button>
+      <button class="btn-ghost" onclick="resetScan()">✕ Clear</button>
+    </div>
+  </div>
+
+  <div class="tab-bar" id="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn" onclick="switchTab('magic')">Magic Bytes</button>
+    <button class="tab-btn" onclick="switchTab('entropy')">Entropy</button>
+    <button class="tab-btn" onclick="switchTab('strings')">Strings <span id="str-count"></span></button>
+    <button class="tab-btn" onclick="switchTab('struct')">Structure</button>
+    <button class="tab-btn" onclick="switchTab('hex')">Hex View</button>
+    <button class="tab-btn" onclick="switchTab('rosa')">ROSA</button>
+  </div>
+
+  <div class="tab-panels">
+    <!-- OVERVIEW -->
+    <div class="tab-panel active" id="tab-overview">
+      <div class="overview-grid">
+        <div>
+          <div class="card">
+            <div class="card-head">File Information</div>
+            <div class="card-body" id="ov-fileinfo"></div>
+          </div>
+          <div class="card">
+            <div class="card-head">Entropy Summary</div>
+            <div class="card-body" id="ov-entropy"></div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-head">Key Findings <span id="ov-finding-count"></span></div>
+            <div class="card-body">
+              <div class="findings-list" id="ov-findings"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAGIC BYTES -->
+    <div class="tab-panel" id="tab-magic">
+      <div class="card">
+        <div class="card-head">First 256 Bytes — Hex Dump</div>
+        <div class="card-body">
+          <div class="hex-dump" id="magic-hexdump"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">Signature Matches</div>
+        <div class="card-body" id="magic-sigs"></div>
+      </div>
+      <div id="magic-mismatch"></div>
+    </div>
+
+    <!-- ENTROPY -->
+    <div class="tab-panel" id="tab-entropy">
+      <div class="card">
+        <div class="card-head">Entropy Heatmap — per 4KB chunk</div>
+        <div class="card-body">
+          <canvas id="entropy-canvas"></canvas>
+          <div class="entropy-legend">
+            <span><span class="legend-swatch" style="background:#1a4a2a"></span>0–2 Structured</span>
+            <span><span class="legend-swatch" style="background:#1a3a5a"></span>2–4 Normal</span>
+            <span><span class="legend-swatch" style="background:#6a5a00"></span>4–6 Compressed</span>
+            <span><span class="legend-swatch" style="background:#8a2a00"></span>6–7 High</span>
+            <span><span class="legend-swatch" style="background:#cc1122"></span>7–8 Encrypted/Packed</span>
+          </div>
+          <div id="entropy-stats"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">Byte Frequency Distribution</div>
+        <div class="card-body">
+          <canvas id="freq-canvas" style="width:100%;height:60px;display:block;border:1px solid var(--border)"></canvas>
+          <div id="freq-stats" style="margin-top:8px;font-size:10px;color:var(--text3)"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STRINGS -->
+    <div class="tab-panel" id="tab-strings">
+      <div class="str-filters" id="str-filters"></div>
+      <div id="strings-table-wrap"></div>
+    </div>
+
+    <!-- STRUCTURE -->
+    <div class="tab-panel" id="tab-struct">
+      <div id="struct-content"></div>
+    </div>
+
+    <!-- HEX VIEW -->
+    <div class="tab-panel" id="tab-hex">
+      <div class="hex-viewer-controls">
+        <button class="hex-pg-btn" id="hex-prev" onclick="hexPage(-1)">◀ Prev</button>
+        <button class="hex-pg-btn" id="hex-next" onclick="hexPage(1)">Next ▶</button>
+        <span class="hex-pg-info" id="hex-pg-info"></span>
+        <input type="text" class="hex-search" id="hex-search" placeholder="Search hex (e.g. 4D5A)..." oninput="hexSearch(this.value)">
+      </div>
+      <div class="hex-viewer-body" id="hex-viewer-body"></div>
+    </div>
+
+    <!-- ROSA -->
+    <div class="tab-panel" id="tab-rosa">
+      <div class="card">
+        <div class="card-head">ROSA Structural Analysis — Suffix Automaton Metrics</div>
+        <div class="card-body">
+          <div class="rosa-grid" id="rosa-metrics"></div>
+          <div id="rosa-detail"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">Bigram Distribution Map — byte[n] → byte[n+1]</div>
+        <div class="card-body">
+          <canvas id="bigram-canvas" width="256" height="256" style="width:256px;height:256px;max-width:100%;image-rendering:pixelated;border:1px solid var(--border)"></canvas>
+          <div style="font-size:9px;color:var(--text3);margin-top:6px;letter-spacing:0.08em">Each pixel (x,y) = frequency of byte value x followed by y. Bright = common pair.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- DEBUG -->
+<div id="debug-zone">
+  <button class="debug-toggle" onclick="toggleDebug()">
+    <span>▶ Debug Panel</span>
+    <span style="color:var(--text4);font-size:8px">RAW SCAN DATA</span>
+  </button>
+  <div id="debug-body">
+    <div class="debug-json" id="debug-json">No scan data yet.</div>
+  </div>
+</div>
+
+<!-- HELP MODAL -->
+<div id="modal-overlay" onclick="if(event.target===this)closeHelp()">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">Once Bytten — Help</span>
+      <button class="modal-close" onclick="closeHelp()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <h3>What is Once Bytten?</h3>
+        <p>A browser-native, zero-dependency byte-level file security scanner. Everything runs locally in your browser. No file ever leaves your device.</p>
+      </div>
+      <div class="modal-section">
+        <h3>Threat Levels</h3>
+        <ul>
+          <li><code>CLEAN</code> — No suspicious indicators found</li>
+          <li><code>LOW</code> — Minor anomalies or informational flags</li>
+          <li><code>MEDIUM</code> — Suspicious patterns, type mismatches, or embedded executables in archives</li>
+          <li><code>HIGH</code> — Multiple high-risk indicators confirmed</li>
+          <li><code>CRITICAL</code> — Confirmed malicious patterns or extreme structural anomalies</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h3>Tabs</h3>
+        <ul>
+          <li><code>Overview</code> — Summary, threat badge, key findings</li>
+          <li><code>Magic Bytes</code> — File type detection from raw bytes, extension mismatch</li>
+          <li><code>Entropy</code> — Shannon entropy heatmap, byte frequency distribution</li>
+          <li><code>Strings</code> — Extracted printable strings: URLs, IPs, paths, keywords, base64</li>
+          <li><code>Structure</code> — Format-specific parsing: PE headers, ELF, ZIP contents, PDF flags</li>
+          <li><code>Hex View</code> — Paginated raw hex viewer with search</li>
+          <li><code>ROSA</code> — Suffix automaton structural analysis, bigram distribution map</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h3>Entropy Guide</h3>
+        <ul>
+          <li>0–2: Very structured data (mostly zeros, ASCII text)</li>
+          <li>2–5: Normal program code or text</li>
+          <li>5–7: Compressed data (zip, gzip contents)</li>
+          <li>7–8: Encrypted or packed data — common in malware payloads</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h3>ROSA Analysis</h3>
+        <p>ROSA (Rapid Online Suffix Automaton) builds a minimal deterministic finite automaton over sampled file bytes. The state count and transition density reveal structural properties invisible to Shannon entropy — particularly useful for detecting hidden patterns in seemingly random data.</p>
+      </div>
+      <div class="modal-section">
+        <h3>Xinu Compliance</h3>
+        <p>Once Bytten is fully browser-native: zero external dependencies, zero network calls, single HTML file. The browser is the runtime.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+
+const MAX_BYTES = 200 * 1024 * 1024;
+const CHUNK_SZ = 4096;
+const HEX_ROWS_PER_PAGE = 32; // 512 bytes per page
+const STRING_MIN_LEN = 6;
+const ROSA_SAMPLE_SZ = 8192;
+
+// ═══════════════════════════════════════════════════════════════
+// MAGIC BYTES DATABASE
+// ═══════════════════════════════════════════════════════════════
+
+const MAGIC_DB = [
+  {sig:[0x4D,0x5A],name:'Windows PE (EXE/DLL/SYS)',exts:['exe','dll','sys','scr','com','drv'],risk:3,desc:'Windows Portable Executable. Contains native machine code.'},
+  {sig:[0x7F,0x45,0x4C,0x46],name:'ELF Executable',exts:['elf','so','out',''],risk:3,desc:'Linux/Unix Executable and Linkable Format binary.'},
+  {sig:[0xCE,0xFA,0xED,0xFE],name:'Mach-O 32-bit (LE)',exts:[''],risk:3,desc:'macOS/iOS 32-bit native executable.'},
+  {sig:[0xCF,0xFA,0xED,0xFE],name:'Mach-O 64-bit (LE)',exts:[''],risk:3,desc:'macOS/iOS 64-bit native executable.'},
+  {sig:[0xBE,0xBA,0xFE,0xCA],name:'Mach-O 32-bit (BE)',exts:[''],risk:3,desc:'macOS/iOS 32-bit big-endian executable.'},
+  {sig:[0xBF,0xBA,0xFE,0xCA],name:'Mach-O 64-bit (BE)',exts:[''],risk:3,desc:'macOS/iOS 64-bit big-endian executable.'},
+  {sig:[0xCA,0xFE,0xBA,0xBE],name:'Java Class / Mach-O FAT',exts:['class'],risk:2,desc:'Java bytecode or macOS universal fat binary.'},
+  {sig:[0x23,0x21],name:'Script (Shebang)',exts:['sh','bash','py','rb','pl','php'],risk:2,desc:'Unix script with interpreter directive line.'},
+  {sig:[0x3C,0x3F,0x70,0x68,0x70],name:'PHP Script',exts:['php'],risk:3,desc:'PHP server-side script. Can execute arbitrary code.'},
+  {sig:[0x25,0x50,0x44,0x46],name:'PDF Document',exts:['pdf'],risk:2,desc:'PDF can embed JavaScript, launch actions, and exploit renderers.'},
+  {sig:[0xD0,0xCF,0x11,0xE0,0xA1,0xB1,0x1A,0xE1],name:'MS Compound Document',exts:['doc','xls','ppt','msi','msg'],risk:2,desc:'Legacy Microsoft Office format. Supports VBA macros.'},
+  {sig:[0x50,0x4B,0x03,0x04],name:'ZIP Archive',exts:['zip','docx','xlsx','pptx','jar','apk','war','odt'],risk:1,desc:'ZIP compressed archive. May contain executable content.'},
+  {sig:[0x50,0x4B,0x05,0x06],name:'ZIP Archive (empty)',exts:['zip'],risk:0,desc:'Empty ZIP archive end-of-central-directory record.'},
+  {sig:[0x52,0x61,0x72,0x21,0x1A,0x07],name:'RAR Archive',exts:['rar'],risk:1,desc:'RAR compressed archive.'},
+  {sig:[0x37,0x7A,0xBC,0xAF,0x27,0x1C],name:'7-Zip Archive',exts:['7z'],risk:1,desc:'7-Zip compressed archive.'},
+  {sig:[0x1F,0x8B],name:'GZIP Compressed',exts:['gz','tgz'],risk:1,desc:'GZIP stream. Content type unknown without decompression.'},
+  {sig:[0x42,0x5A,0x68],name:'BZIP2 Compressed',exts:['bz2'],risk:1,desc:'BZIP2 compressed data.'},
+  {sig:[0xFD,0x37,0x7A,0x58,0x5A,0x00],name:'XZ Compressed',exts:['xz'],risk:1,desc:'XZ/LZMA2 compressed data.'},
+  {sig:[0x04,0x22,0x4D,0x18],name:'LZ4 Frame',exts:['lz4'],risk:0,desc:'LZ4 compressed frame.'},
+  {sig:[0x28,0xB5,0x2F,0xFD],name:'Zstandard',exts:['zst'],risk:0,desc:'Zstandard compressed data.'},
+  {sig:[0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A],name:'PNG Image',exts:['png'],risk:0,desc:'PNG image file.'},
+  {sig:[0xFF,0xD8,0xFF],name:'JPEG Image',exts:['jpg','jpeg','jfif'],risk:0,desc:'JPEG image file.'},
+  {sig:[0x47,0x49,0x46,0x38],name:'GIF Image',exts:['gif'],risk:0,desc:'GIF image. Script-capable in some renderers.'},
+  {sig:[0x42,0x4D],name:'BMP Image',exts:['bmp'],risk:0,desc:'Windows Bitmap image.'},
+  {sig:[0x52,0x49,0x46,0x46],name:'RIFF Container',exts:['wav','avi','webp'],risk:0,desc:'RIFF container (WAV audio, AVI video, WebP image).'},
+  {sig:[0x38,0x42,0x50,0x53],name:'Photoshop PSD',exts:['psd','psb'],risk:0,desc:'Adobe Photoshop document.'},
+  {sig:[0x49,0x49,0x2A,0x00],name:'TIFF (little-endian)',exts:['tif','tiff'],risk:0,desc:'TIFF image, little-endian byte order.'},
+  {sig:[0x4D,0x4D,0x00,0x2A],name:'TIFF (big-endian)',exts:['tif','tiff'],risk:0,desc:'TIFF image, big-endian byte order.'},
+  {sig:[0x49,0x44,0x33],name:'MP3 Audio (ID3)',exts:['mp3'],risk:0,desc:'MP3 audio with ID3 metadata tag.'},
+  {sig:[0xFF,0xFB],name:'MP3 Audio Frame',exts:['mp3'],risk:0,desc:'Raw MP3 audio frame.'},
+  {sig:[0x4F,0x67,0x67,0x53],name:'OGG Container',exts:['ogg','ogv','oga','opus'],risk:0,desc:'OGG audio/video container.'},
+  {sig:[0x66,0x4C,0x61,0x43],name:'FLAC Audio',exts:['flac'],risk:0,desc:'FLAC lossless audio.'},
+  {sig:[0x1A,0x45,0xDF,0xA3],name:'WebM / MKV',exts:['webm','mkv','mka'],risk:0,desc:'Matroska/WebM media container.'},
+  {sig:[0x53,0x51,0x4C,0x69,0x74,0x65,0x20],name:'SQLite Database',exts:['db','sqlite','sqlite3'],risk:1,desc:'SQLite database file.'},
+  {sig:[0x25,0x21,0x50,0x53],name:'PostScript',exts:['ps','eps'],risk:1,desc:'PostScript is Turing-complete. Can execute arbitrary operations.'},
+  {sig:[0x7B,0x5C,0x72,0x74,0x66],name:'RTF Document',exts:['rtf'],risk:1,desc:'Rich Text Format. Can embed OLE objects and exploit parsers.'},
+  {sig:[0x77,0x4F,0x46,0x46],name:'WOFF Font',exts:['woff'],risk:0,desc:'Web Open Font Format.'},
+  {sig:[0x77,0x4F,0x46,0x32],name:'WOFF2 Font',exts:['woff2'],risk:0,desc:'Web Open Font Format 2.'},
+  {sig:[0x00,0x00,0x01,0x00],name:'Windows ICO',exts:['ico'],risk:0,desc:'Windows icon file.'},
+  {sig:[0x4D,0x54,0x68,0x64],name:'MIDI Sequence',exts:['mid','midi'],risk:0,desc:'Standard MIDI file.'},
+  {sig:[0x4C,0x00,0x00,0x00,0x01,0x14,0x02,0x00],name:'Windows Shortcut (LNK)',exts:['lnk'],risk:3,desc:'Windows Shell Link. Can execute arbitrary commands.'},
+  {sig:[0x5B,0x5A,0x6F,0x6E,0x65,0x54,0x72,0x61],name:'Zone Identifier',exts:[''],risk:2,desc:'Windows Zone.Identifier ADS marker (download provenance).'},
+  {sig:[0xEF,0xBB,0xBF],name:'UTF-8 BOM',exts:[''],risk:0,desc:'UTF-8 byte order mark. File is UTF-8 encoded text.'},
+  {sig:[0xFF,0xFE],name:'UTF-16 LE BOM',exts:[''],risk:0,desc:'UTF-16 little-endian byte order mark.'},
+  {sig:[0xFE,0xFF],name:'UTF-16 BE BOM',exts:[''],risk:0,desc:'UTF-16 big-endian byte order mark.'},
+];
+
+// ═══════════════════════════════════════════════════════════════
+// SUSPICIOUS STRING PATTERNS
+// ═══════════════════════════════════════════════════════════════
+
+const STR_PATTERNS = [
+  {re:/https?:\/\/[a-zA-Z0-9._\-\/?=&%+#]{8,}/g,cat:'URL',risk:1},
+  {re:/ftp:\/\/[a-zA-Z0-9._\-\/?=&%+]{8,}/g,cat:'URL',risk:1},
+  {re:/\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(?::\d{2,5})?\b/g,cat:'IP',risk:1},
+  {re:/HKEY_(?:LOCAL_MACHINE|CURRENT_USER|CLASSES_ROOT|USERS|CURRENT_CONFIG)[\\\/][^\x00\r\n]{4,}/g,cat:'REGISTRY',risk:2},
+  {re:/[A-Za-z]:\\[^\x00\r\n<>|"]{4,}/g,cat:'WIN_PATH',risk:1},
+  {re:/\/(?:etc|proc|sys|usr|bin|sbin|home|var|tmp|dev|run)\/[^\x00\s]{2,}/g,cat:'UNIX_PATH',risk:1},
+  {re:/\b(?:cmd\.exe|powershell(?:\.exe)?|wscript(?:\.exe)?|cscript(?:\.exe)?|mshta(?:\.exe)?|regsvr32(?:\.exe)?|rundll32(?:\.exe)?|certutil(?:\.exe)?|bitsadmin(?:\.exe)?|msiexec(?:\.exe)?)\b/gi,cat:'WIN_TOOL',risk:3},
+  {re:/\b(?:eval|exec|system|shell_exec|passthru|popen|proc_open|pcntl_exec|assert)\s*\(/g,cat:'CODE_EXEC',risk:3},
+  {re:/\b(?:wget|curl -|nc -|netcat|ncat -|socat |bash -i|python -c|perl -e|ruby -e)\b/g,cat:'NET_TOOL',risk:2},
+  {re:/[A-Za-z0-9+\/]{80,}={0,2}/g,cat:'BASE64',risk:1},
+  {re:/[a-zA-Z0-9._%+\-]{3,}@[a-zA-Z0-9.\-]{3,}\.[a-zA-Z]{2,}/g,cat:'EMAIL',risk:0},
+];
+
+// ═══════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════
+
+function esc(str) {
+  return str.replace(/[&<>]/g, function(m) {
+    if (m === '&') return '&amp;';
+    if (m === '<') return '&lt;';
+    if (m === '>') return '&gt;';
+    return m;
+  });
+}
+
+function fmtBytes(n){
+  if(n<1024)return n+' B';
+  if(n<1048576)return (n/1024).toFixed(1)+' KB';
+  if(n<1073741824)return (n/1048576).toFixed(2)+' MB';
+  return (n/1073741824).toFixed(2)+' GB';
+}
+
+function fmtHex(b){return b.toString(16).padStart(2,'0').toUpperCase()}
+
+function isPrintable(b){return b>=0x20&&b<0x7F}
+
+function toAscii(b){return isPrintable(b)?String.fromCharCode(b):'.'}
+
+function shannonEntropy(bytes,off,len){
+  const freq=new Uint32Array(256);
+  const end=Math.min(off+len,bytes.length);
+  const actual=end-off;
+  if(actual<=0)return 0;
+  for(let i=off;i<end;i++)freq[bytes[i]]++;
+  let h=0;
+  for(let i=0;i<256;i++){
+    if(freq[i]===0)continue;
+    const p=freq[i]/actual;
+    h-=p*Math.log2(p);
+  }
+  return h;
+}
+
+function entropyColor(h){
+  // 0-2: dark green, 2-4: dark blue, 4-6: dark amber, 6-7: dark orange, 7-8: red
+  if(h<2)return[26,74,42];
+  if(h<4)return[26,58,90];
+  if(h<6)return[106,90,0];
+  if(h<7)return[138,58,0];
+  return[204,17,34];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+
+let scanData=null;
+let hexCurrentPage=0;
+let hexTotalPages=0;
+let hexSearchBytes=null;
+let currentStrFilter='ALL';
+let currentScanId = 0;
+
+// ═══════════════════════════════════════════════════════════════
+// SCAN ENGINE
+// ═══════════════════════════════════════════════════════════════
+
+function handleFile(file){
+  if(!file)return;
+  if(file.size>MAX_BYTES){
+    alert('File too large. Maximum size is 200 MB.\nFile size: '+fmtBytes(file.size));
+    return;
+  }
+  document.getElementById('drop-zone').style.display='none';
+  document.getElementById('progress-zone').style.display='block';
+  document.getElementById('results-zone').style.display='none';
+
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const buf=e.target.result;
+    const bytes=new Uint8Array(buf);
+    setPhase('ingest',10,'Ingesting bytes...');
+    setTimeout(()=>runScan(file,bytes),50);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function setPhase(id,pct,label){
+  document.getElementById('prog-phase').textContent=label;
+  document.getElementById('prog-pct').textContent=pct+'%';
+  document.getElementById('prog-bar').style.width=pct+'%';
+  const pips=['ingest','magic','entropy','strings','rosa','struct','hex'];
+  const idx=pips.indexOf(id);
+  pips.forEach((p,i)=>{
+    const el=document.getElementById('pip-'+p);
+    if(i<idx)el.className='phase-pip done';
+    else if(i===idx)el.className='phase-pip active';
+    else el.className='phase-pip';
+  });
+}
+
+function runScan(file,bytes){
+  if (bytes.length === 0) {
+    alert('File is empty. Nothing to scan.');
+    resetScan();
+    return;
+  }
+  currentScanId++;
+  const myId = currentScanId;
+  const ext=(file.name.split('.').pop()||'').toLowerCase();
+  const data={
+    file:{name:file.name,size:file.size,ext,type:file.type,lastModified:new Date(file.lastModified).toISOString()},
+    magic:{},entropy:{},strings:[],structure:{},hex:{},rosa:{},
+    threat:0,findings:[]
+  };
+
+  // PHASE: MAGIC
+  setPhase('magic',20,'Scanning magic bytes...');
+  setTimeout(()=>{
+    if (myId !== currentScanId) return;
+    data.magic=scanMagic(bytes,ext);
+    data.threat=Math.max(data.threat,...data.magic.matches.map(m=>m.risk));
+    if(data.magic.mismatch){data.threat=Math.max(data.threat,3);data.findings.push({level:'crit',msg:'File type mismatch: extension .'+ext+' but detected as '+data.magic.detectedType})}
+    if(data.magic.matches.length===0)data.findings.push({level:'info',msg:'No known file signature detected in first 512 bytes'});
+    else data.magic.matches.forEach(m=>{if(m.risk>=3)data.findings.push({level:'crit',msg:'Executable format detected: '+m.name})});
+    if(data.magic.lnk)data.findings.push({level:'crit',msg:'Windows Shortcut (LNK) detected — can execute arbitrary commands'});
+
+    // PHASE: ENTROPY
+    setPhase('entropy',40,'Computing entropy...');
+    setTimeout(()=>{
+      if (myId !== currentScanId) return;
+      data.entropy=scanEntropy(bytes);
+      const avgH=data.entropy.avg;
+      if(avgH>7.2){data.threat=Math.max(data.threat,2);data.findings.push({level:'warn',msg:'Very high average entropy ('+avgH.toFixed(2)+') — may indicate encryption or packing'})}
+      else if(avgH>6.5)data.findings.push({level:'info',msg:'High average entropy ('+avgH.toFixed(2)+') — possibly compressed data'});
+      if(data.entropy.highEntropyRegions>0)data.findings.push({level:'warn',msg:data.entropy.highEntropyRegions+' high-entropy region(s) detected — possible embedded encrypted payload'});
+
+      // PHASE: STRINGS
+      setPhase('strings',55,'Extracting strings...');
+      setTimeout(()=>{
+        if (myId !== currentScanId) return;
+        data.strings=extractStrings(bytes);
+        const dangerStr=data.strings.filter(s=>s.risk>=3);
+        if(dangerStr.length>0){data.threat=Math.max(data.threat,2);data.findings.push({level:'crit',msg:dangerStr.length+' high-risk string(s) found: '+dangerStr.slice(0,2).map(s=>s.val.slice(0,30)).join(', ')})}
+        const urls=data.strings.filter(s=>s.cat==='URL');
+        if(urls.length>0)data.findings.push({level:'info',msg:urls.length+' URL(s) extracted'});
+        const ips=data.strings.filter(s=>s.cat==='IP');
+        if(ips.length>0)data.findings.push({level:'warn',msg:ips.length+' IP address(es) found'});
+        const b64=data.strings.filter(s=>s.cat==='BASE64');
+        if(b64.length>0)data.findings.push({level:'warn',msg:b64.length+' potential base64 blob(s) found'});
+
+        // PHASE: ROSA
+        setPhase('rosa',68,'ROSA structural analysis...');
+        setTimeout(()=>{
+          if (myId !== currentScanId) return;
+          data.rosa=rosaAnalyze(bytes);
+          if(data.rosa.compressionRatio<1.05&&data.entropy.avg>6)data.findings.push({level:'warn',msg:'Low structural repetition with high entropy — consistent with encrypted/random data'});
+
+          // PHASE: STRUCTURE
+          setPhase('struct',82,'Parsing structure...');
+          setTimeout(()=>{
+            if (myId !== currentScanId) return;
+            data.structure=parseStructure(bytes,data.magic);
+            if(data.structure.pe&&data.structure.pe.suspicious.length>0){
+              data.threat=Math.max(data.threat,2);
+              data.structure.pe.suspicious.forEach(s=>data.findings.push({level:'warn',msg:'PE: '+s}));
+            }
+            if(data.structure.zip&&data.structure.zip.hasExecutable){
+              data.threat=Math.max(data.threat,2);
+              data.findings.push({level:'warn',msg:'ZIP contains executable file(s)'});
+            }
+            if(data.structure.pdf&&data.structure.pdf.hasJS){
+              data.threat=Math.max(data.threat,2);
+              data.findings.push({level:'warn',msg:'PDF contains JavaScript'});
+            }
+
+            // PHASE: HEX
+            setPhase('hex',94,'Building hex view...');
+            setTimeout(()=>{
+              if (myId !== currentScanId) return;
+              data.hex={bytes:bytes};
+              hexTotalPages=Math.ceil(bytes.length/(HEX_ROWS_PER_PAGE*16));
+              hexCurrentPage=0;
+
+              // FINALIZE
+              if(data.threat===0&&data.findings.length===0)data.findings.push({level:'safe',msg:'No suspicious indicators detected'});
+              scanData=data;
+              document.getElementById('debug-json').textContent=JSON.stringify({...data,hex:'[omitted]'},null,2);
+              document.getElementById('prog-bar').style.width='100%';
+              document.getElementById('prog-pct').textContent='100%';
+              document.getElementById('prog-phase').textContent='Complete';
+              setPhase('hex', 100, 'Complete');
+              setTimeout(() => {
+                if (myId !== currentScanId) return;
+                renderResults(data);
+              }, 200);
+            },30);
+          },30);
+        },30);
+      },30);
+    },30);
+  },30);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAGIC BYTES SCANNER
+// ═══════════════════════════════════════════════════════════════
+
+function scanMagic(bytes,ext){
+  const head=bytes.slice(0,512);
+  const matches=[];
+  for(const entry of MAGIC_DB){
+    const {sig,offset=0}=entry;
+    if(head.length<offset+sig.length)continue;
+    let ok=true;
+    for(let i=0;i<sig.length;i++){
+      if(head[offset+i]!==sig[i]){ok=false;break;}
+    }
+    if(ok)matches.push({...entry,offset});
+  }
+
+  // Check for polyglot (multiple valid sigs)
+  const isPolyglot=matches.length>1&&matches.some(m=>m.risk>=2);
+
+  // Extension mismatch
+  let mismatch=false;
+  let detectedType='';
+  if(matches.length>0&&ext){
+    const primary=matches[0];
+    detectedType=primary.name;
+    if(primary.exts.length>0&&!primary.exts.includes(ext)&&ext!==''){
+      // Check all matches
+      const anyMatchExt=matches.some(m=>m.exts.includes(ext));
+      if(!anyMatchExt)mismatch=true;
+    }
+  }
+
+  // Null byte density
+  let nullCount=0;
+  for(let i=0;i<bytes.length;i++)if(bytes[i]===0)nullCount++;
+  const nullDensity=nullCount/bytes.length;
+
+  // Build hex dump of first 256 bytes
+  const hexLines=[];
+  for(let row=0;row<16&&row*16<Math.min(256,bytes.length);row++){
+    const off=row*16;
+    const rowBytes=[];
+    const rowAsc=[];
+    for(let c=0;c<16&&off+c<bytes.length;c++){
+      rowBytes.push(fmtHex(bytes[off+c]));
+      rowAsc.push(toAscii(bytes[off+c]));
+    }
+    hexLines.push({off,bytes:rowBytes,asc:rowAsc});
+  }
+
+  return {matches,mismatch,detectedType,isPolyglot,nullCount,nullDensity,hexLines,
+    lnk:matches.some(m=>m.name.includes('Shortcut'))};
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENTROPY ANALYSIS
+// ═══════════════════════════════════════════════════════════════
+
+function scanEntropy(bytes){
+  const chunkCount=Math.ceil(bytes.length/CHUNK_SZ);
+  const chunks=[];
+  let sumH=0,minH=8,maxH=0,highCount=0;
+
+  for(let i=0;i<chunkCount;i++){
+    const h=shannonEntropy(bytes,i*CHUNK_SZ,CHUNK_SZ);
+    chunks.push(h);
+    sumH+=h;
+    if(h<minH)minH=h;
+    if(h>maxH)maxH=h;
+    if(h>7.2)highCount++;
+  }
+
+  // Full byte frequency
+  const freq=new Uint32Array(256);
+  for(let i=0;i<bytes.length;i++)freq[bytes[i]]++;
+
+  // Most/least common bytes
+  let topByte=0,topCount=0,bottomByte=0,bottomCount=Infinity;
+  for(let i=0;i<256;i++){
+    if(freq[i]>topCount){topCount=freq[i];topByte=i;}
+    if(freq[i]<bottomCount){bottomCount=freq[i];bottomByte=i;}
+  }
+
+  return{chunks,avg:chunkCount>0?sumH/chunkCount:0,min:minH,max:maxH,
+    highEntropyRegions:highCount,freq,topByte,topCount,bottomByte};
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STRING EXTRACTION
+// ═══════════════════════════════════════════════════════════════
+
+function extractStrings(bytes){
+  // Build a large printable-ASCII string from the whole file with null-as-separator
+  let text='';
+  const offsets=[];
+  let runStart=-1;
+  const results=[];
+
+  // Collect all printable runs
+  for(let i=0;i<=bytes.length;i++){
+    const b=i<bytes.length?bytes[i]:0;
+    if(isPrintable(b)){
+      if(runStart===-1)runStart=i;
+    } else {
+      if(runStart!==-1&&(i-runStart)>=STRING_MIN_LEN){
+        const slice = bytes.slice(runStart, i);
+        let s = '';
+        for (let j = 0; j < slice.length; j++) s += String.fromCharCode(slice[j]);
+        // Scan for patterns
+        for(const pat of STR_PATTERNS){
+          pat.re.lastIndex=0;
+          let m;
+          while((m=pat.re.exec(s))!==null){
+            results.push({val:m[0],cat:pat.cat,risk:pat.risk,offset:runStart+m.index});
+          }
+        }
+      }
+      runStart=-1;
+    }
+  }
+
+  // Deduplicate by value+cat
+  const seen=new Set();
+  return results.filter(r=>{
+    const k=r.cat+'|'+r.val.slice(0,80);
+    if(seen.has(k))return false;
+    seen.add(k);
+    return true;
+  }).slice(0,500); // cap at 500
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ROSA STRUCTURAL ANALYSIS
+// ═══════════════════════════════════════════════════════════════
+
+function rosaAnalyze(bytes){
+  if (bytes.length < 256) {
+    return { samples: [], bigram: new Uint32Array(65536), bigramEntropy: 0, states: 0, compressionRatio: 1, density: 0, usedPositions: [] };
+  }
+  // Sample up to 3 positions: start, middle, end
+  const samples=[];
+  const positions=[0,Math.floor(bytes.length/2),Math.max(0,bytes.length-ROSA_SAMPLE_SZ)];
+  const usedPositions=[];
+
+  for(const pos of positions){
+    if(bytes.length-pos<256)continue;
+    const end=Math.min(pos+ROSA_SAMPLE_SZ,bytes.length);
+    const sample=bytes.slice(pos,end);
+    const metrics=rosaOnSample(sample,pos);
+    samples.push(metrics);
+    usedPositions.push(pos);
+  }
+
+  // Bigram map over entire file (sampled every N bytes for large files)
+  const bgStep=bytes.length>1048576?Math.ceil(bytes.length/524288):1;
+  const bigram=new Uint32Array(65536);
+  for(let i=0;i<bytes.length-1;i+=bgStep){
+    bigram[bytes[i]*256+bytes[i+1]]++;
+  }
+
+  // Bigram entropy
+  let bgTotal=0;
+  for(let i=0;i<65536;i++)bgTotal+=bigram[i];
+  let bgEntropy=0;
+  for(let i=0;i<65536;i++){
+    if(bigram[i]===0)continue;
+    const p=bigram[i]/bgTotal;
+    bgEntropy-=p*Math.log2(p);
+  }
+
+  // Average metrics
+  const avgStates=samples.reduce((s,m)=>s+m.states,0)/Math.max(1,samples.length);
+  const avgRatio=samples.reduce((s,m)=>s+m.compressionRatio,0)/Math.max(1,samples.length);
+  const avgDensity=samples.reduce((s,m)=>s+m.density,0)/Math.max(1,samples.length);
+
+  return{samples,bigram,bigramEntropy:bgEntropy,
+    states:Math.round(avgStates),compressionRatio:avgRatio,
+    density:avgDensity,usedPositions};
+}
+
+function rosaOnSample(bytes,fileOffset){
+  // Lightweight suffix automaton
+  const sa={
+    len:[0],link:[-1],next:[new Map()],
+    last:0,count:1
+  };
+
+  function saExtend(c){
+    const cur=sa.count++;
+    sa.len.push(sa.len[sa.last]+1);
+    sa.link.push(-1);
+    sa.next.push(new Map());
+    let p=sa.last;
+    while(p!==-1&&!sa.next[p].has(c)){
+      sa.next[p].set(c,cur);
+      p=sa.link[p];
+    }
+    if(p===-1){
+      sa.link[cur]=0;
+    } else {
+      const q=sa.next[p].get(c);
+      if(sa.len[p]+1===sa.len[q]){
+        sa.link[cur]=q;
+      } else {
+        const clone=sa.count++;
+        sa.len.push(sa.len[p]+1);
+        sa.link.push(sa.link[q]);
+        sa.next.push(new Map(sa.next[q]));
+        sa.link[q]=clone;
+        sa.link[cur]=clone;
+        while(p!==-1&&sa.next[p].get(c)===q){
+          sa.next[p].set(c,clone);
+          p=sa.link[p];
+        }
+      }
+    }
+    sa.last=cur;
+  }
+
+  const limit=Math.min(bytes.length,ROSA_SAMPLE_SZ);
+  for(let i=0;i<limit;i++)saExtend(bytes[i]);
+
+  const states=sa.count;
+  let transitions=0;
+  for(let i=0;i<states;i++)transitions+=sa.next[i].size;
+  const density=states>0?transitions/states:0;
+  const compressionRatio=limit/Math.max(1,states);
+
+  return{states,transitions,density,compressionRatio,sampleSize:limit,fileOffset};
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STRUCTURE PARSERS
+// ═══════════════════════════════════════════════════════════════
+
+function parseStructure(bytes,magic){
+  const result={};
+  const isPE=magic.matches.some(m=>m.name.includes('Windows PE'));
+  const isELF=magic.matches.some(m=>m.name.includes('ELF'));
+  const isZIP=magic.matches.some(m=>m.name.includes('ZIP')&&!m.name.includes('empty'));
+  const isPDF=magic.matches.some(m=>m.name.includes('PDF'));
+  const isMSOLE=magic.matches.some(m=>m.name.includes('Compound'));
+
+  if(isPE)result.pe=parsePE(bytes);
+  if(isELF)result.elf=parseELF(bytes);
+  if(isZIP)result.zip=parseZIP(bytes);
+  if(isPDF)result.pdf=parsePDF(bytes);
+  if(isMSOLE)result.ole={note:'MS Compound (OLE) document. VBA macros may be present. Consider running macro extraction tools.'};
+
+  return result;
+}
+
+function r16le(b,o){return b[o]|(b[o+1]<<8)}
+function r32le(b,o){return(b[o]|(b[o+1]<<8)|(b[o+2]<<16)|(b[o+3]<<24))>>>0}
+
+const PE_MACHINE={0x14C:'x86',0x8664:'x86-64',0x1C0:'ARM',0xAA64:'ARM64',0x200:'IA64'};
+const PE_CHARS={0x0002:'Executable',0x0020:'Large addr aware',0x0100:'32-bit',0x0200:'No debug',0x2000:'DLL'};
+const SECTION_CHARS={0x20:'Code',0x40:'Init data',0x80:'Uninit data',0x20000000:'Execute',0x40000000:'Read',0x80000000:'Write'};
+
+function parsePE(bytes){
+  try{
+    if(bytes[0]!==0x4D||bytes[1]!==0x5A)return{error:'Not a valid PE'};
+    const peOff=r32le(bytes,0x3C);
+    if (peOff + 4 > bytes.length) return {error: 'PE header offset out of range'};
+    if(peOff+24>bytes.length)return{error:'PE offset out of range'};
+    if(bytes[peOff]!==0x50||bytes[peOff+1]!==0x45)return{error:'PE signature not found'};
+    if (peOff + 24 > bytes.length) return {error: 'PE header truncated'};
+
+    const machine=r16le(bytes,peOff+4);
+    const numSections=r16le(bytes,peOff+6);
+    const timestamp=r32le(bytes,peOff+8);
+    const characteristics=r16le(bytes,peOff+22);
+    const optSize=r16le(bytes,peOff+20);
+    const optOff=peOff+24;
+    const magic16=r16le(bytes,optOff);
+    const is64=magic16===0x20B;
+    const subsystem=is64?r16le(bytes,optOff+68):r16le(bytes,optOff+68);
+
+    const subsystems={1:'Native',2:'Windows GUI',3:'Windows Console',9:'Windows CE',14:'Xbox',16:'Boot App'};
+    const charFlags=[];
+    for(const[bit,name] of Object.entries(PE_CHARS))if(characteristics&parseInt(bit))charFlags.push(name);
+
+    // Sections
+    const sectOff=optOff+optSize;
+    const sections=[];
+    const suspicious=[];
+    for(let i=0;i<Math.min(numSections,32);i++){
+      const sOff=sectOff+i*40;
+      if(sOff+40>bytes.length)break;
+      if (sectOff + (i+1)*40 > bytes.length) break;
+      const nameBytes=bytes.slice(sOff,sOff+8);
+      let nameRaw='';
+      for(let j=0;j<8&&nameBytes[j]!==0;j++)nameRaw+=String.fromCharCode(nameBytes[j]);
+      const name=esc(nameRaw);
+      const vsize=r32le(bytes,sOff+8);
+      const rawSize=r32le(bytes,sOff+16);
+      const rawOff=r32le(bytes,sOff+20);
+      const sChars=r32le(bytes,sOff+36);
+      const sFlags=[];
+      for(const[bit,sname] of Object.entries(SECTION_CHARS))if(sChars&parseInt(bit))sFlags.push(sname);
+
+      // Compute section entropy
+      let sEntropy=0;
+      if (rawOff + rawSize > bytes.length) {
+        sEntropy = 0;
+      } else if (rawOff > 0 && rawSize > 0) {
+        sEntropy = shannonEntropy(bytes, rawOff, rawSize);
+      }
+
+      if(sEntropy>7.2)suspicious.push('Section "'+name+'" has very high entropy ('+sEntropy.toFixed(2)+') — possible packed/encrypted code');
+      if(sFlags.includes('Execute')&&sFlags.includes('Write'))suspicious.push('Section "'+name+'" is both writable and executable (W+X) — common in shellcode loaders');
+
+      sections.push({name:name||'(unnamed)',vsize,rawSize,sEntropy:sEntropy.toFixed(2),flags:sFlags.join(', ')});
+    }
+
+    const tsDate=new Date(timestamp*1000).toISOString();
+    const tooOld=timestamp<946684800; // before year 2000
+    const tooNew=timestamp>(Date.now()/1000)+86400;
+    if(tooOld||tooNew)suspicious.push('Suspicious PE timestamp: '+tsDate+' (may indicate forged compilation time)');
+    if(numSections===0)suspicious.push('PE has no sections — unusual, possible hollow PE or corrupt file');
+
+    return{machine:PE_MACHINE[machine]||'Unknown ('+fmtHex(machine)+fmtHex(machine>>8)+')',
+      numSections,timestamp:tsDate,is64,
+      subsystem:subsystems[subsystem]||'Unknown ('+subsystem+')',
+      characteristics:charFlags.join(', '),sections,suspicious};
+  }catch(e){return{error:'PE parse error: '+e.message}}
+}
+
+function parseELF(bytes){
+  try{
+    if(bytes[0]!==0x7F)return{error:'Not ELF'};
+    const bits=bytes[4]===1?32:64;
+    const endian=bytes[5]===1?'Little-endian':'Big-endian';
+    const types={0:'None',1:'Relocatable',2:'Executable',3:'Shared object',4:'Core'};
+    const eType=bytes[5]===1?r16le(bytes,16):(bytes[16]<<8|bytes[17]);
+    const machines={0x3E:'x86-64',0x28:'ARM',0xB7:'AArch64',0x02:'SPARC',0x08:'MIPS',0x16:'PowerPC'};
+    const machVal=bytes[5]===1?r16le(bytes,18):(bytes[18]<<8|bytes[19]);
+    const entryOff=bits===32?r32le(bytes,24):(Number(BigInt(r32le(bytes,24))+(BigInt(r32le(bytes,28))<<32n)));
+    return{bits,endian,type:types[eType]||'Unknown ('+eType+')',
+      machine:machines[machVal]||'Unknown (0x'+machVal.toString(16)+')',
+      entryPoint:'0x'+(typeof entryOff==='number'?entryOff.toString(16):entryOff.toString(16))};
+  }catch(e){return{error:'ELF parse error: '+e.message}}
+}
+
+function parseZIP(bytes){
+  const entries=[];
+  let i=0;
+  let hasExecutable=false;
+  const EXTSIG=[0x50,0x4B,0x03,0x04];
+  while(i<bytes.length-4){
+    if(bytes[i]===EXTSIG[0]&&bytes[i+1]===EXTSIG[1]&&bytes[i+2]===EXTSIG[2]&&bytes[i+3]===EXTSIG[3]){
+      if(i+30>bytes.length)break;
+      const flags=r16le(bytes,i+6);
+      const compMethod=r16le(bytes,i+8);
+      const compSize=r32le(bytes,i+18);
+      const uncompSize=r32le(bytes,i+22);
+      const fnLen=r16le(bytes,i+26);
+      const extraLen=r16le(bytes,i+28);
+      if(fnLen>0&&i+30+fnLen<=bytes.length){
+        let fnameRaw='';
+        for(let j=0;j<fnLen;j++)fnameRaw+=String.fromCharCode(bytes[i+30+j]);
+        const fname = esc(fnameRaw);
+        const ext=fname.split('.').pop().toLowerCase();
+        const isDangerous=['exe','dll','scr','bat','cmd','ps1','vbs','js','jar','sh','py','rb'].includes(ext);
+        if(isDangerous)hasExecutable=true;
+        entries.push({name:fname,compSize,uncompSize,encrypted:!!(flags&1),dangerous:isDangerous});
+      }
+      i+=30+fnLen+extraLen+compSize;
+      if(entries.length>=200)break;
+    } else i++;
+  }
+  return{entries,hasExecutable,count:entries.length};
+}
+
+function parsePDF(bytes){
+  const text=String.fromCharCode(...bytes.slice(0,Math.min(bytes.length,65536)).filter(b=>b<128));
+  const hasJS=/\/(?:JS|JavaScript)\b/.test(text);
+  const hasAA=/\/AA\b/.test(text);
+  const hasOpenAction=/\/OpenAction\b/.test(text);
+  const hasEmbeddedFile=/\/EmbeddedFile\b/.test(text);
+  const hasBinary=bytes.slice(0,65536).some(b=>b>127);
+  const versionMatch=text.match(/%PDF-(\d+\.\d+)/);
+  return{version:versionMatch?versionMatch[1]:'unknown',hasJS,hasAA,hasOpenAction,
+    hasEmbeddedFile,hasBinary};
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER RESULTS
+// ═══════════════════════════════════════════════════════════════
+
+const THREAT_LABELS=['CLEAN','LOW','MEDIUM','HIGH','CRITICAL'];
+const THREAT_ICONS=['✓','△','⚠','✗','☠'];
+
+function renderResults(d){
+  document.getElementById('progress-zone').style.display='none';
+  document.getElementById('results-zone').style.display='block';
+
+  // File header
+  document.getElementById('res-filename').textContent=d.file.name;
+  document.getElementById('res-meta').textContent=
+    fmtBytes(d.file.size)+' · .'+d.file.ext+(d.file.type?' · '+d.file.type:'')+' · '+d.file.lastModified.replace('T',' ').slice(0,19)+' UTC';
+  const thr=Math.min(d.threat,4);
+  document.getElementById('res-threat').innerHTML=
+    `<span class="threat-badge threat-${thr}">${THREAT_ICONS[thr]} ${THREAT_LABELS[thr]}</span>`;
+  document.getElementById('str-count').textContent='('+d.strings.length+')';
+
+  renderOverview(d);
+  renderMagic(d);
+  renderEntropy(d);
+  renderStrings(d);
+  renderStructure(d);
+  renderHexPage(0);
+  renderROSA(d);
+}
+
+function renderOverview(d){
+  const thr=Math.min(d.threat,4);
+  document.getElementById('ov-fileinfo').innerHTML=
+    ['Name','Size','Type','Extension','Last Modified'].map((l,i)=>{
+      const v=[d.file.name,fmtBytes(d.file.size),d.file.type||'(unknown)','.'+d.file.ext,d.file.lastModified.slice(0,19)+' UTC'][i];
+      return`<div class="stat-row"><span class="stat-label">${l}</span><span class="stat-val">${v}</span></div>`;
+    }).join('');
+
+  const avgH=d.entropy.avg.toFixed(3);
+  document.getElementById('ov-entropy').innerHTML=`
+    <div class="stat-row"><span class="stat-label">Average Entropy</span><span class="stat-val">${avgH} / 8.000</span></div>
+    <div class="stat-row"><span class="stat-label">Min / Max</span><span class="stat-val">${d.entropy.min.toFixed(3)} / ${d.entropy.max.toFixed(3)}</span></div>
+    <div class="stat-row"><span class="stat-label">High-Entropy Regions</span><span class="stat-val">${d.entropy.highEntropyRegions}</span></div>
+    <div class="stat-row"><span class="stat-label">Null Density</span><span class="stat-val">${(d.magic.nullDensity*100).toFixed(2)}%</span></div>
+    <div class="stat-row"><span class="stat-label">Strings Extracted</span><span class="stat-val">${d.strings.length}</span></div>
+  `;
+
+  document.getElementById('ov-finding-count').textContent='('+d.findings.length+')';
+  const fl={'safe':'finding-safe','info':'finding-info','warn':'finding-warn','crit':'finding-crit'};
+  const fi={'safe':'✓','info':'ℹ','warn':'⚠','crit':'✗'};
+  document.getElementById('ov-findings').innerHTML=d.findings.map(f=>
+    `<div class="finding ${fl[f.level]||'finding-info'}">${fi[f.level]||'·'} ${f.msg}</div>`).join('');
+}
+
+function renderMagic(d){
+  const m=d.magic;
+  // Hex dump
+  const hd=document.getElementById('magic-hexdump');
+  hd.innerHTML=m.hexLines.map(row=>{
+    const off='<span class="hex-offset">'+row.off.toString(16).padStart(8,'0').toUpperCase()+'</span>';
+    const byt=row.bytes.map(b=>'<span>'+b+'</span>').join(' ');
+    const asc=row.asc.map(c=>'<span>'+c.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</span>').join('');
+    return`<div class="hex-row">${off}<span class="hex-bytes">${byt}</span><span class="hex-ascii">${asc}</span></div>`;
+  }).join('');
+
+  // Signature table
+  const sb=document.getElementById('magic-sigs');
+  if(m.matches.length===0){
+    sb.innerHTML='<div style="color:var(--text3);font-size:11px;padding:8px">No known file signatures matched.</div>';
+  } else {
+    sb.innerHTML=`<table class="sig-table">
+      <thead><tr><th>Signature</th><th>Detected Type</th><th>Expected Extensions</th><th>Risk</th><th>Notes</th></tr></thead>
+      <tbody>${m.matches.map(s=>`<tr class="tr${s.risk}">
+        <td>${s.sig.map(b=>fmtHex(b)).join(' ')}</td>
+        <td>${s.name}</td>
+        <td>${s.exts.join(', ')||'—'}</td>
+        <td><span class="risk-pill risk-${s.risk}">${['SAFE','LOW','MEDIUM','HIGH','CRITICAL'][s.risk]}</span></td>
+        <td style="color:var(--text3);font-size:10px">${s.desc||''}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  // Mismatch warning
+  const mm=document.getElementById('magic-mismatch');
+  mm.innerHTML='';
+  if(m.mismatch)mm.innerHTML=`<div class="mismatch-warn">⚠ Extension mismatch: file has extension <strong>.${d.file.ext}</strong> but magic bytes identify it as <strong>${m.detectedType}</strong>. This is a common disguise technique.</div>`;
+  if(m.isPolyglot&&m.matches.length>1)mm.innerHTML+=`<div class="mismatch-warn" style="margin-top:6px">⚠ Polyglot file: multiple valid format signatures detected. File may be valid in multiple formats simultaneously.</div>`;
+}
+
+function renderEntropy(d){
+  const canvas=document.getElementById('entropy-canvas');
+  const chunks=d.entropy.chunks;
+  const MAX_BARS = 2000;
+  let displayChunks = chunks;
+  if (chunks.length > MAX_BARS) {
+    const step = chunks.length / MAX_BARS;
+    displayChunks = [];
+    for (let i = 0; i < MAX_BARS; i++) {
+      const start = Math.floor(i * step);
+      const end = Math.floor((i+1) * step);
+      let sum = 0;
+      for (let j = start; j < end; j++) sum += chunks[j];
+      displayChunks.push(sum / (end - start));
+    }
+  } else {
+    displayChunks = chunks.slice();
+  }
+  const W = Math.max(displayChunks.length, 1);
+  canvas.width=W;canvas.height=1;
+  canvas.style.height='60px';
+  const ctx=canvas.getContext('2d');
+  const img=ctx.createImageData(W,1);
+  for(let i=0;i<displayChunks.length;i++){
+    const[r,g,b]=entropyColor(displayChunks[i]);
+    img.data[i*4]=r;img.data[i*4+1]=g;img.data[i*4+2]=b;img.data[i*4+3]=255;
+  }
+  ctx.putImageData(img,0,0);
+
+  document.getElementById('entropy-stats').innerHTML=`
+    <div class="stat-row"><span class="stat-label">Overall Average</span><span class="stat-val">${d.entropy.avg.toFixed(4)} bits/byte</span></div>
+    <div class="stat-row"><span class="stat-label">Min / Max chunk entropy</span><span class="stat-val">${d.entropy.min.toFixed(4)} / ${d.entropy.max.toFixed(4)}</span></div>
+    <div class="stat-row"><span class="stat-label">Total chunks (4KB each)</span><span class="stat-val">${chunks.length}</span></div>
+    <div class="stat-row"><span class="stat-label">High-entropy chunks (&gt;7.2)</span><span class="stat-val">${d.entropy.highEntropyRegions} (${((d.entropy.highEntropyRegions/Math.max(1,chunks.length))*100).toFixed(1)}%)</span></div>
+  `;
+
+  // Byte frequency canvas
+  const fc=document.getElementById('freq-canvas');
+  fc.width=256;fc.height=32;fc.style.height='60px';
+  const fctx=fc.getContext('2d');
+  const freq=d.entropy.freq;
+  let maxF=0;
+  for(let i=0;i<256;i++)if(freq[i]>maxF)maxF=freq[i];
+  fctx.fillStyle='#070707';
+  fctx.fillRect(0,0,256,32);
+  for(let i=0;i<256;i++){
+    const h=maxF>0?Math.round((freq[i]/maxF)*32):0;
+    const pct=freq[i]/d.file.size;
+    let col='#336699';
+    if(pct>0.1)col='#CC1122';
+    else if(pct>0.05)col='#CC8800';
+    fctx.fillStyle=col;
+    fctx.fillRect(i,32-h,1,h);
+  }
+  const top=d.entropy.topByte;
+  document.getElementById('freq-stats').innerHTML=
+    `Most frequent byte: <span style="color:var(--text)">0x${fmtHex(top)}</span> (${d.entropy.topCount.toLocaleString()} times, ${((d.entropy.topCount/d.file.size)*100).toFixed(2)}%)`;
+}
+
+function renderStrings(d){
+  const cats=[...new Set(d.strings.map(s=>s.cat))].sort();
+  const filters=document.getElementById('str-filters');
+  filters.innerHTML='<button class="str-filter on" onclick="filterStr(\'ALL\',this)">All ('+d.strings.length+')</button>'+
+    cats.map(c=>'<button class="str-filter" onclick="filterStr(\''+c+'\',this)">'+c+' ('+d.strings.filter(s=>s.cat===c).length+')</button>').join('');
+  renderStringTable('ALL');
+}
+
+function filterStr(cat,btn){
+  currentStrFilter=cat;
+  document.querySelectorAll('.str-filter').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  renderStringTable(cat);
+}
+
+function renderStringTable(cat){
+  const d=scanData;
+  const rows=cat==='ALL'?d.strings:d.strings.filter(s=>s.cat===cat);
+  const wrap=document.getElementById('strings-table-wrap');
+  if(rows.length===0){
+    wrap.innerHTML='<div class="str-empty">No strings in this category.</div>';return;
+  }
+  wrap.innerHTML=`<table class="str-table">
+    <thead><tr><th>Offset</th><th>Category</th><th>Value</th></tr></thead>
+    <tbody>${rows.slice(0,300).map(s=>`<tr>
+      <td class="str-off">0x${s.offset.toString(16).toUpperCase()}</td>
+      <td><span class="cat-pill cat-${s.cat}">${s.cat}</span></td>
+      <td class="str-val">${esc(s.val).slice(0,120)}</td>
+    </tr>`).join('')}</tbody>
+  </table>${rows.length>300?`<div style="color:var(--text3);font-size:10px;padding:8px">${rows.length-300} more strings not shown.</div>`:''}`;
+}
+
+function renderStructure(d){
+  const s=d.structure;
+  const el=document.getElementById('struct-content');
+  if(Object.keys(s).length===0){
+    el.innerHTML='<div style="color:var(--text3);font-size:11px;padding:16px">No structured format detected for detailed parsing.</div>';return;
+  }
+  let html='';
+
+  if(s.pe){
+    const p=s.pe;
+    if(p.error){html+=`<div class="card"><div class="card-head">PE Header</div><div class="card-body" style="color:var(--warn)">${p.error}</div></div>`;}
+    else{
+      html+=`<div class="card"><div class="card-head">PE Header</div><div class="card-body">
+        <div class="struct-section"><div class="struct-label">COFF Header</div>
+          <div class="kv-list">
+            <div class="kv-key">Architecture</div><div class="kv-val">${p.machine} (${p.is64?'64-bit':'32-bit'})</div>
+            <div class="kv-key">Sections</div><div class="kv-val">${p.numSections}</div>
+            <div class="kv-key">Timestamp</div><div class="kv-val">${p.timestamp}</div>
+            <div class="kv-key">Subsystem</div><div class="kv-val">${p.subsystem}</div>
+            <div class="kv-key">Characteristics</div><div class="kv-val">${p.characteristics}</div>
+          </div>
+        </div>
+        ${p.sections.length>0?`<div class="struct-section"><div class="struct-label">Sections</div>
+          <table class="sig-table"><thead><tr><th>Name</th><th>Raw Size</th><th>Entropy</th><th>Flags</th></tr></thead>
+          <tbody>${p.sections.map(sec=>`<tr><td>${esc(sec.name)}</td><td>${fmtBytes(sec.rawSize)}</td><td style="color:${parseFloat(sec.sEntropy)>7.2?'var(--bite)':parseFloat(sec.sEntropy)>6?'var(--warn)':'var(--text2)'}">${sec.sEntropy}</td><td style="color:var(--text3);font-size:10px">${sec.flags}</td></tr>`).join('')}
+          </tbody></table></div>`:''}
+        ${p.suspicious.length>0?'<div class="struct-section">'+p.suspicious.map(w=>`<div class="mismatch-warn">⚠ ${w}</div>`).join('')+'</div>':''}
+      </div></div>`;
+    }
+  }
+
+  if(s.elf){
+    const e=s.elf;
+    html+=`<div class="card"><div class="card-head">ELF Header</div><div class="card-body">
+      <div class="kv-list">
+        <div class="kv-key">Bits</div><div class="kv-val">${e.bits}-bit</div>
+        <div class="kv-key">Endianness</div><div class="kv-val">${e.endian}</div>
+        <div class="kv-key">Type</div><div class="kv-val">${e.type}</div>
+        <div class="kv-key">Machine</div><div class="kv-val">${e.machine}</div>
+        <div class="kv-key">Entry Point</div><div class="kv-val">${e.entryPoint}</div>
+      </div>
+    </div></div>`;
+  }
+
+  if(s.zip){
+    const z=s.zip;
+    html+=`<div class="card"><div class="card-head">ZIP Contents (${z.count} entries${z.hasExecutable?' ⚠ CONTAINS EXECUTABLES':''})</div><div class="card-body">
+      ${z.hasExecutable?'<div class="mismatch-warn">⚠ Archive contains executable file(s)</div>':''}
+      <div class="zip-list">${z.entries.map(e=>`
+        <div class="zip-entry">
+          <span class="zip-name" style="color:${e.dangerous?'var(--bite-bright)':'var(--text2)'}">${esc(e.name)}</span>
+          <span>${e.encrypted?'<span class="zip-flag">🔒 ENCRYPTED</span>':''}</span>
+          <span class="zip-size">${fmtBytes(e.uncompSize)}</span>
+        </div>`).join('')}
+      </div>
+    </div></div>`;
+  }
+
+  if(s.pdf){
+    const p=s.pdf;
+    const flags=[];
+    if(p.hasJS)flags.push({l:'⚠ Contains JavaScript (/JS)',c:'var(--warn)'});
+    if(p.hasOpenAction)flags.push({l:'⚠ Has OpenAction — auto-executes on open',c:'var(--warn)'});
+    if(p.hasAA)flags.push({l:'⚠ Has Additional Actions (/AA)',c:'var(--warn)'});
+    if(p.hasEmbeddedFile)flags.push({l:'ℹ Contains embedded file',c:'var(--info-bright)'});
+    if(!flags.length)flags.push({l:'✓ No active content detected in first 64KB',c:'var(--safe-bright)'});
+    html+=`<div class="card"><div class="card-head">PDF Structure</div><div class="card-body">
+      <div class="kv-list"><div class="kv-key">Version</div><div class="kv-val">${esc(p.version)}</div></div>
+      <div style="margin-top:10px">${flags.map(f=>`<div style="color:${f.c};font-size:11px;margin-bottom:4px">${f.l}</div>`).join('')}</div>
+    </div></div>`;
+  }
+
+  if(s.ole){
+    html+=`<div class="card"><div class="card-head">MS Compound Document</div><div class="card-body">
+      <div style="color:var(--warn);font-size:11px">${s.ole.note}</div>
+    </div></div>`;
+  }
+
+  el.innerHTML=html||'<div style="color:var(--text3);font-size:11px;padding:16px">No detailed structure parsed.</div>';
+}
+
+function renderHexPage(page){
+  const bytes=scanData.hex.bytes;
+  const bytesPerPage=HEX_ROWS_PER_PAGE*16;
+  hexTotalPages=Math.ceil(bytes.length/bytesPerPage);
+  page=Math.max(0,Math.min(page,hexTotalPages-1));
+  hexCurrentPage=page;
+
+  const start=page*bytesPerPage;
+  const end=Math.min(start+bytesPerPage,bytes.length);
+  let html='';
+
+  for(let row=start;row<end;row+=16){
+    const off=row;
+    let hexPart='',ascPart='';
+    for(let c=0;c<16;c++){
+      const idx=off+c;
+      if(idx>=end){hexPart+='   ';ascPart+=' ';}
+      else{
+        const b=bytes[idx];
+        const h=fmtHex(b);
+        const a=toAscii(b).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+        let hl=hexSearchBytes&&matchesSearch(bytes,idx,hexSearchBytes);
+        hexPart+=hl?`<span class="hvr-hl">${h}</span> `:`${h} `;
+        ascPart+=hl?`<span class="hvr-hl">${a}</span>`:a;
+      }
+      if(c===7){hexPart+=' ';}
+    }
+    html+=`<div class="hvr"><span class="hvr-off">${off.toString(16).padStart(8,'0').toUpperCase()}</span><span class="hvr-hex">${hexPart}</span><span class="hvr-asc">${ascPart}</span></div>`;
+  }
+
+  document.getElementById('hex-viewer-body').innerHTML=html;
+  document.getElementById('hex-pg-info').textContent=`Page ${page+1} / ${hexTotalPages} (offset ${start.toLocaleString()}–${(end-1).toLocaleString()})`;
+  document.getElementById('hex-prev').disabled=page===0;
+  document.getElementById('hex-next').disabled=page>=hexTotalPages-1;
+}
+
+function matchesSearch(bytes,idx,pattern){
+  if(idx+pattern.length>bytes.length)return false;
+  for(let i=0;i<pattern.length;i++)if(bytes[idx+i]!==pattern[i])return false;
+  return true;
+}
+
+function hexPage(delta){renderHexPage(hexCurrentPage+delta)}
+
+function hexSearch(val){
+  const hex=val.replace(/\s/g,'');
+  if(hex.length<2){hexSearchBytes=null;renderHexPage(hexCurrentPage);return;}
+  try{
+    const bytes=[];
+    for(let i=0;i<hex.length-1;i+=2)bytes.push(parseInt(hex.slice(i,i+2),16));
+    hexSearchBytes=bytes.length>0?bytes:null;
+  }catch{hexSearchBytes=null;}
+  renderHexPage(hexCurrentPage);
+}
+
+function renderROSA(d){
+  const r=d.rosa;
+  document.getElementById('rosa-metrics').innerHTML=`
+    <div class="rosa-metric"><div class="rosa-val">${r.states.toLocaleString()}</div><div class="rosa-lbl">Avg SAM States</div></div>
+    <div class="rosa-metric"><div class="rosa-val">${r.compressionRatio.toFixed(3)}</div><div class="rosa-lbl">Compression Ratio</div></div>
+    <div class="rosa-metric"><div class="rosa-val">${r.bigramEntropy.toFixed(3)}</div><div class="rosa-lbl">Bigram Entropy</div></div>
+    <div class="rosa-metric"><div class="rosa-val">${r.density.toFixed(2)}</div><div class="rosa-lbl">Transition Density</div></div>
+    <div class="rosa-metric"><div class="rosa-val">${(r.bigramEntropy/Math.max(0.01,d.entropy.avg)).toFixed(3)}</div><div class="rosa-lbl">Bigram/Shannon Ratio</div></div>
+    <div class="rosa-metric"><div class="rosa-val">${r.samples.length}</div><div class="rosa-lbl">Sample Regions</div></div>
+  `;
+
+  let detail='<div class="struct-section"><div class="struct-label">Sample Analysis</div><div class="kv-list">';
+  r.samples.forEach((s,i)=>{
+    detail+=`<div class="kv-key">Region ${i+1} (offset ${fmtBytes(s.fileOffset)})</div>
+      <div class="kv-val">${s.states} states / ${s.transitions} transitions — ratio ${s.compressionRatio.toFixed(3)} — density ${s.density.toFixed(2)}</div>`;
+  });
+  detail+=`</div></div>
+    <div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.7">
+      <strong style="color:var(--text2)">Interpretation:</strong><br>
+      Compression ratio near 1 = high structural uniqueness (random/encrypted).<br>
+      Compression ratio &gt;2 = significant repetition (structured/compressed with patterns).<br>
+      Bigram/Shannon ratio near 1 = byte pairs distribute like individual bytes (no sequential structure).<br>
+      Bigram/Shannon ratio &lt;0.8 = strong sequential structure (code, text, structured data).
+    </div>`;
+  document.getElementById('rosa-detail').innerHTML=detail;
+
+  // Bigram canvas
+  const bc=document.getElementById('bigram-canvas');
+  const bctx=bc.getContext('2d');
+  const bg=d.rosa.bigram;
+  let maxBG=0;
+  for(let i=0;i<65536;i++)if(bg[i]>maxBG)maxBG=bg[i];
+  const imgData=bctx.createImageData(256,256);
+  for(let x=0;x<256;x++){
+    for(let y=0;y<256;y++){
+      const v=maxBG>0?Math.round((bg[x*256+y]/maxBG)*255):0;
+      const idx=(y*256+x)*4;
+      imgData.data[idx]=v>128?v:Math.round(v*0.3);
+      imgData.data[idx+1]=Math.round(v*0.1);
+      imgData.data[idx+2]=Math.round(v*0.15);
+      imgData.data[idx+3]=255;
+    }
+  }
+  bctx.putImageData(imgData,0,0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI CONTROLS
+// ═══════════════════════════════════════════════════════════════
+
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>{
+    const names=['overview','magic','entropy','strings','struct','hex','rosa'];
+    b.classList.toggle('active',names[i]===name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p=>{
+    p.classList.toggle('active',p.id==='tab-'+name);
+  });
+}
+
+function resetScan(){
+  scanData=null;
+  document.getElementById('drop-zone').style.display='block';
+  document.getElementById('progress-zone').style.display='none';
+  document.getElementById('results-zone').style.display='none';
+  document.getElementById('file-input').value='';
+  document.getElementById('debug-json').textContent='No scan data yet.';
+  hexCurrentPage=0;hexSearchBytes=null;
+}
+
+function toggleDebug(){
+  const body=document.getElementById('debug-body');
+  const btn=document.querySelector('.debug-toggle span');
+  const open=body.classList.toggle('open');
+  btn.textContent=(open?'▼':'▶')+' Debug Panel';
+}
+
+function openHelp(){document.getElementById('modal-overlay').classList.add('open')}
+function closeHelp(){document.getElementById('modal-overlay').classList.remove('open')}
+
+function exportReport(){
+  if(!scanData)return;
+  const exp={...scanData,hex:'[byte array omitted]'};
+  const blob=new Blob([JSON.stringify(exp,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='once-bytten-report-'+scanData.file.name+'.json';
+  a.click();URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRAG AND DROP
+// ═══════════════════════════════════════════════════════════════
+
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+dz.addEventListener('drop',e=>{
+  e.preventDefault();dz.classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];
+  if(f)handleFile(f);
+});
+</script>
+</body>
+</html>

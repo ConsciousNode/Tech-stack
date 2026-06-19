@@ -1,0 +1,4340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OmniVocal Phase 6 — ConsciousNode SoftWorks</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap');
+
+  :root {
+    --bg:       #080a0e;
+    --bg1:      #0d1117;
+    --bg2:      #131920;
+    --bg3:      #1a2333;
+    --border:   #1e2d42;
+    --border2:  #243547;
+    --text:     #c9d8e8;
+    --dim:      #5a7a96;
+    --accent:   #00d4ff;
+    --accent2:  #0096cc;
+    --gold:     #f0b429;
+    --green:    #22c55e;
+    --red:      #ef4444;
+    --mel1:     #001a3a;
+    --mel2:     #003d7a;
+    --mel3:     #0066cc;
+    --mel4:     #00aaff;
+    --mel5:     #66ddff;
+    --mel6:     #ffffff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    background: var(--bg1);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .brand-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 20px;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+
+  .brand-sub {
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .phase-badge {
+    font-size: 10px;
+    color: var(--gold);
+    border: 1px solid var(--gold);
+    padding: 2px 8px;
+    letter-spacing: 1px;
+    opacity: 0.8;
+  }
+
+  .status-strip {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--dim);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--dim);
+    display: inline-block;
+    margin-right: 4px;
+  }
+  .status-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-dot.working { background: var(--gold); box-shadow: 0 0 6px var(--gold); animation: pulse 0.8s infinite; }
+  .status-dot.err { background: var(--red); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: auto auto 1fr;
+    gap: 0;
+    height: calc(100vh - 53px);
+  }
+
+  /* ── PANELS ── */
+  .panel {
+    background: var(--bg1);
+    border: 1px solid var(--border);
+  }
+
+  /* ── INPUT AREA ── */
+  .input-panel {
+    grid-column: 1;
+    grid-row: 1;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .input-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+
+  textarea#text-input {
+    background: var(--bg2);
+    color: var(--text);
+    border: 1px solid var(--border2);
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    padding: 12px;
+    resize: none;
+    outline: none;
+    height: 80px;
+    transition: border-color 0.15s;
+  }
+  textarea#text-input:focus { border-color: var(--accent2); }
+
+  .controls-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  /* ── BUTTONS ── */
+  button {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    color: var(--text);
+    padding: 7px 14px;
+    letter-spacing: 0.5px;
+    transition: all 0.1s;
+  }
+  button:hover:not(:disabled) { background: var(--bg3); border-color: var(--accent2); color: var(--accent); }
+  button:disabled { opacity: 0.35; cursor: default; }
+
+  button.primary {
+    background: var(--accent2);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 700;
+  }
+  button.primary:hover:not(:disabled) { background: var(--accent); }
+
+  button.danger {
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  /* ── PHONEME STRIP ── */
+  .phoneme-panel {
+    grid-column: 1;
+    grid-row: 2;
+    border-right: none;
+    padding: 12px 16px;
+    min-height: 52px;
+  }
+
+  .phoneme-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  #phoneme-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    min-height: 26px;
+    align-items: center;
+  }
+
+  .ph-chip {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--accent);
+    font-size: 12px;
+    padding: 1px 6px;
+    font-family: 'Space Mono', monospace;
+    transition: background 0.1s;
+  }
+  .ph-chip.active {
+    background: var(--accent2);
+    color: #000;
+    border-color: var(--accent);
+  }
+  .ph-chip.pause { color: var(--dim); border-style: dashed; }
+  .ph-chip.silence { color: var(--dim); border-style: dotted; font-size: 10px; }
+
+  #phoneme-count {
+    font-size: 10px;
+    color: var(--dim);
+    margin-left: 8px;
+  }
+
+  /* ── MEL CANVAS ── */
+  .synthesis-panel {
+    grid-column: 1;
+    grid-row: 3;
+    border-right: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .mel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg1);
+  }
+
+  .mel-title {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+
+  .mel-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 10px;
+    color: var(--dim);
+  }
+
+  .mel-stat-val { color: var(--accent); }
+
+  #mel-canvas {
+    flex: 1;
+    width: 100%;
+    display: block;
+    image-rendering: pixelated;
+    background: #000;
+  }
+
+  /* ── WAVEFORM ── */
+  #wave-canvas {
+    width: 100%;
+    height: 60px;
+    display: block;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── RIGHT PANEL ── */
+  /* ── RIGHT PANEL TABS ── */
+  .rp-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .rp-tab {
+    flex: 1;
+    padding: 9px 4px;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--dim);
+    text-align: center;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    user-select: none;
+  }
+  .rp-tab:hover { color: var(--text); }
+  .rp-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .rp-pane { display: none; flex-direction: column; flex: 1; overflow-y: auto; min-height: 0; }
+  .rp-pane.active { display: flex; }
+
+  /* ── POP STUDIO (inside right panel) ── */
+  .pop-studio-inner {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .pop-section-title {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 6px;
+  }
+
+  /* ── PLAYBACK CURSOR ── */
+  #wave-canvas { cursor: pointer; }
+  .wave-wrap { position: relative; }
+  #wave-cursor {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 1px;
+    background: rgba(255,255,255,0.6);
+    pointer-events: none;
+    display: none;
+  }
+
+  /* ── MEL ZOOM ── */
+  .mel-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    font-size: 10px;
+    color: var(--dim);
+  }
+  .mel-controls button {
+    padding: 2px 8px;
+    font-size: 10px;
+    min-width: unset;
+  }
+  #mel-zoom-label { min-width: 30px; text-align: center; color: var(--accent); }
+
+  /* ── VOCODER STATUS CLEANUP ── */
+  .model-status-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 3px 12px;
+    font-size: 10px;
+    line-height: 1.9;
+  }
+  .ms-key { color: var(--dim); letter-spacing: 0.08em; text-transform: uppercase; }
+  .ms-val { color: var(--text); }
+  .ms-val.green { color: var(--green); }
+  .ms-val.accent { color: var(--accent); }
+  .ms-val.dim { color: var(--dim); }
+
+  .right-panel {
+    grid-column: 2;
+    grid-row: 1 / 4;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    border-left: 1px solid var(--border);
+  }
+
+  .rp-section {
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+  }
+
+  .rp-title {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* ── VOICE SPACE ── */
+  .axis-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+  }
+
+  .axis-label {
+    font-size: 10px;
+    color: var(--dim);
+    width: 90px;
+    flex-shrink: 0;
+    letter-spacing: 0.5px;
+  }
+
+  .axis-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    background: var(--border2);
+    outline: none;
+    cursor: pointer;
+  }
+  .axis-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  .axis-val {
+    font-size: 10px;
+    color: var(--accent);
+    width: 32px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── VOICE DESC ── */
+  #voice-desc {
+    font-size: 11px;
+    color: var(--gold);
+    font-style: italic;
+    line-height: 1.5;
+    min-height: 18px;
+    margin-top: 8px;
+  }
+
+  /* ── SYNTH PARAMS ── */
+  .param-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+  }
+
+  .param-label {
+    font-size: 10px;
+    color: var(--dim);
+    width: 70px;
+    flex-shrink: 0;
+  }
+
+  .param-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    background: var(--border2);
+    outline: none;
+    cursor: pointer;
+  }
+  .param-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--gold);
+    cursor: pointer;
+  }
+
+  .param-val {
+    font-size: 10px;
+    color: var(--gold);
+    width: 36px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── LOG ── */
+  #log {
+    background: var(--bg);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: #3d6b8a;
+    padding: 10px;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 120px;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .log-ok   { color: var(--green); }
+  .log-info { color: var(--accent); }
+  .log-warn { color: var(--gold); }
+  .log-err  { color: var(--red); }
+  .log-dim  { color: var(--dim); }
+
+  /* ── PROGRESS ── */
+  .progress-bar-wrap {
+    height: 2px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.1s linear;
+  }
+
+  /* ── VOCODER TAG ── */
+  .vocoder-tag {
+    font-size: 9px;
+    padding: 1px 5px;
+    letter-spacing: 1px;
+    border: 1px solid var(--border2);
+    color: var(--dim);
+    margin-left: 8px;
+  }
+  .vocoder-tag.active {
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  /* ── FOOTER ── */
+  /* ── POP STUDIO ── */
+  .pop-studio {
+    background: var(--bg1);
+    border-top: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .pop-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 180px;
+  }
+  .pop-title {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 4px;
+  }
+  .pop-status {
+    font-size: 11px;
+    color: var(--dim);
+    min-height: 16px;
+  }
+  .pop-status.ok  { color: var(--green); }
+  .pop-status.err { color: var(--red); }
+  .pop-status.wrk { color: var(--gold); }
+  .pop-meter {
+    width: 100%;
+    height: 4px;
+    background: var(--bg3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .pop-meter-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.1s;
+  }
+  .pop-meter-fill.gold { background: var(--gold); }
+  .pop-meter-fill.green { background: var(--green); }
+  canvas#rec-canvas {
+    width: 100%;
+    height: 40px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    display: block;
+  }
+  .pop-name-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .pop-name-row input[type=text] {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    padding: 4px 8px;
+    flex: 1;
+    outline: none;
+  }
+  .pop-name-row input[type=text]:focus { border-color: var(--accent2); }
+  .pop-progress-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+  }
+  .pop-epoch-label {
+    font-size: 10px;
+    color: var(--dim);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .footer-strip {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 16px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 1px;
+  }
+
+  select {
+    background: var(--bg2);
+    color: var(--text);
+    border: 1px solid var(--border2);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 5px 8px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .hidden { display: none !important; }
+
+  /* ── RESPONSIVE MOBILE ── */
+  @media (max-width: 767px) {
+    header {
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 10px 12px;
+    }
+    .status-strip { font-size: 9px; gap: 8px; }
+    .brand-name { font-size: 16px; }
+
+    main {
+      display: flex;
+      flex-direction: column;
+      height: auto;
+      min-height: calc(100vh - 53px);
+    }
+
+    /* Input panel full width, compact */
+    .input-panel {
+      border-right: 1px solid var(--border);
+      padding: 10px 12px;
+      gap: 8px;
+    }
+
+    textarea#text-input {
+      height: 60px;
+      font-size: 13px;
+    }
+
+    .controls-row {
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    button { padding: 8px 10px; font-size: 10px; }
+    button.primary { padding: 9px 14px; }
+
+    select { font-size: 10px; padding: 7px 6px; }
+
+    /* Phoneme strip compact */
+    .phoneme-panel { padding: 8px 12px; min-height: 44px; }
+    .ph-chip { font-size: 10px; padding: 1px 4px; }
+
+    /* Mel canvas: fixed height on mobile */
+    .synthesis-panel { min-height: 180px; }
+    #mel-canvas { height: 140px; }
+    #wave-canvas { height: 44px; }
+    .mel-header { padding: 6px 10px; flex-wrap: wrap; gap: 4px; }
+    .mel-stats { font-size: 9px; gap: 8px; }
+
+    /* Right panel becomes bottom panel — tabs only, log hidden by default */
+    .right-panel {
+      border-left: none;
+      border-top: 1px solid var(--border);
+      max-height: 340px;
+      overflow-y: auto;
+    }
+
+    /* Tab labels larger touch targets */
+    .tab-btn {
+      padding: 10px 14px !important;
+      font-size: 10px !important;
+    }
+
+    .rp-section { padding: 10px 12px; }
+    .axis-row { gap: 6px; }
+    .axis-label { width: 70px; font-size: 9px; }
+    .axis-val { font-size: 9px; width: 28px; }
+
+    #voice-desc { font-size: 10px; }
+
+    /* Footer compact */
+    .footer-strip {
+      flex-direction: column;
+      gap: 2px;
+      font-size: 8px;
+      padding: 6px 12px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="brand-name">OmniVocal</span>
+    <span class="brand-sub">ConsciousNode SoftWorks</span>
+    <span class="phase-badge">PHASE 6</span>
+  </div>
+  <div class="status-strip">
+    <span><span class="status-dot live" id="sys-dot"></span><span id="sys-label">READY</span></span>
+    <span>24kHz · 80 mel · HiFi-GAN BitLinear</span>
+    <span id="sr-label" style="color:var(--accent)">d=128</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- INPUT -->
+  <div class="panel input-panel">
+    <div class="input-label">Text Input</div>
+    <textarea id="text-input" placeholder="Enter text to synthesize... OmniVocal runs entirely in your browser.">Hello. I am OmniVocal, a browser-native voice synthesis system built by ConsciousNode.</textarea>
+    <div class="controls-row">
+      <button class="primary" id="btn-synth">▶ SYNTHESIZE</button>
+      <button id="btn-stop" class="danger hidden">■ STOP</button>
+      <button id="btn-export">⬇ EXPORT WAV</button>
+      <select id="lang-sel">
+        <option value="en">English</option>
+        <option value="ja">Japanese</option>
+        <option value="ko">Korean</option>
+        <option value="es">Spanish</option>
+        <option value="de">German</option>
+        <option value="fr">French</option>
+        <option value="ru">Russian</option>
+      </select>
+      <button id="btn-vocoder-toggle" title="Toggle between neural vocoder and Griffin-Lim fallback">⚡ NEURAL VOC</button>
+      <span id="phoneme-count" style="margin-left:auto;"></span>
+    </div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+  </div>
+
+  <!-- PHONEME STRIP -->
+  <div class="panel phoneme-panel">
+    <div class="phoneme-label">G2P Output — Phoneme Sequence</div>
+    <div id="phoneme-strip"><span style="color:var(--dim);font-size:11px;">waiting for input...</span></div>
+  </div>
+
+  <!-- MEL + WAVEFORM -->
+  <div class="panel synthesis-panel">
+    <div class="mel-header">
+      <span class="mel-title">Mel Spectrogram · 80 bands · 24kHz</span>
+      <div class="mel-stats">
+        <span>FRAMES <span class="mel-stat-val" id="mel-frames">—</span></span>
+        <span>DURATION <span class="mel-stat-val" id="mel-dur">—</span></span>
+        <span>VOCODER <span class="mel-stat-val" id="vocoder-label">NEURAL</span><span class="vocoder-tag active" id="gl-tag">HIFI-GAN</span></span>
+      </div>
+    </div>
+    <canvas id="mel-canvas"></canvas>
+    <canvas id="wave-canvas"></canvas>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel panel">
+
+    <!-- Tab bar -->
+    <div class="rp-tabs">
+      <div class="rp-tab active" data-tab="voice">Voice</div>
+      <div class="rp-tab" data-tab="synth">Synth</div>
+      <div class="rp-tab" data-tab="studio">★ Studio</div>
+      <div class="rp-tab" data-tab="model">Model</div>
+      <div class="rp-tab" data-tab="log">Log</div>
+    </div>
+
+    <!-- Pane: Voice Space -->
+    <div class="rp-pane active" id="pane-voice">
+      <div class="rp-section">
+        <div class="rp-title">Voice Space · 10-dim</div>
+        <div id="axis-sliders"></div>
+        <div id="voice-desc">measured baritone, warm resonance</div>
+      </div>
+    </div>
+
+    <!-- Pane: Synthesis Parameters -->
+    <div class="rp-pane" id="pane-synth">
+      <div class="rp-section">
+        <div class="rp-title">Synthesis Parameters</div>
+        <div class="param-row">
+          <span class="param-label">RATE</span>
+          <input type="range" class="param-slider" id="rate-sl" min="0.5" max="2.0" step="0.05" value="1.0">
+          <span class="param-val" id="rate-val">1.00x</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">PITCH SHIFT</span>
+          <input type="range" class="param-slider" id="pitch-sl" min="-6" max="6" step="0.5" value="0">
+          <span class="param-val" id="pitch-val">±0</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">GL ITERS</span>
+          <input type="range" class="param-slider" id="gl-sl" min="4" max="48" step="4" value="24">
+          <span class="param-val" id="gl-val">24</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">MVC LAYERS</span>
+          <input type="range" class="param-slider" id="layers-sl" min="1" max="4" step="1" value="2">
+          <span class="param-val" id="layers-val">2</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pane: Pop Studio -->
+    <div class="rp-pane" id="pane-studio">
+      <div class="pop-studio-inner">
+
+        <div>
+          <div class="pop-section-title">★ Voice Capture</div>
+          <canvas id="rec-canvas" width="400" height="40" style="width:100%;height:40px;display:block;background:#0a0d12;border:1px solid var(--border);border-radius:3px;"></canvas>
+          <div class="pop-meter" style="margin-top:4px;"><div class="pop-meter-fill" id="rec-level-fill"></div></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+            <button id="btn-rec-start">⏺ RECORD</button>
+            <button id="btn-rec-stop" disabled>⏹ STOP</button>
+            <button id="btn-rec-clear" disabled>✕ CLEAR</button>
+          </div>
+          <div class="pop-status" id="rec-status" style="margin-top:6px;">ready — mic not yet requested</div>
+        </div>
+
+        <div>
+          <div class="pop-section-title">Analyze + Train</div>
+          <div class="pop-status" id="analyze-status">waiting for recording...</div>
+          <button id="btn-analyze" disabled style="margin-top:6px;">⚙ ANALYZE VOICE</button>
+
+          <div style="margin-top:12px;">
+            <div class="pop-section-title">Spoken text (for training)</div>
+            <input type="text" id="spoken-text" disabled placeholder="Type exactly what you said in the recording" style="width:100%; background:var(--bg2); border:1px solid var(--border); font-family:monospace; font-size:12px; padding:6px 8px;">
+            <div style="font-size:10px; color:var(--dim); margin-top:4px;">Required for meaningful duration training.</div>
+          </div>
+
+          <div style="font-size:10px;color:var(--dim);line-height:1.6;margin-top:8px;padding:7px 8px;border:1px solid var(--border);background:var(--bg);">
+            Training adapts <strong style="color:var(--text);">voice timbre and speaking tempo</strong> to your recording.
+            The duration model learns your natural phoneme timing — exported in the .pop2 file.
+            More recordings = better generalisation.
+          </div>
+          <div class="pop-progress-row" id="train-progress-wrap" style="display:none;margin-top:10px;">
+            <div class="pop-epoch-label">
+              <span>TRAINING</span>
+              <span id="train-epoch-label">epoch 0 / 0</span>
+            </div>
+            <div class="pop-meter"><div class="pop-meter-fill gold" id="train-fill"></div></div>
+            <div class="pop-status wrk" id="train-status">initializing...</div>
+          </div>
+          <button id="btn-train" disabled style="display:none;margin-top:6px;">▶ TRAIN CONDITIONING</button>
+        </div>
+
+        <div>
+          <div class="pop-section-title">Voice Identity (.pop2)</div>
+          <div class="pop-name-row">
+            <input type="text" id="pop2-name" placeholder="voice name (e.g. vael)" maxlength="32" value="">
+            <button id="btn-export-pop2" disabled>⬇ .pop2</button>
+          </div>
+          <button id="btn-load-pop2" style="margin-top:6px;width:100%;">⬆ LOAD .pop2</button>
+          <input type="file" id="pop2-file-in" accept=".pop2,.json" style="display:none;">
+          <div class="pop-status" id="pop2-export-status" style="margin-top:6px;">no voice trained yet</div>
+          <div style="font-size:10px;color:var(--dim);margin-top:4px;line-height:1.7;" id="pop2-meta-display"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Pane: Model Status -->
+    <div class="rp-pane" id="pane-model">
+      <div class="rp-section">
+        <div class="rp-title">Model Status</div>
+        <div class="model-status-grid">
+          <span class="ms-key">Backbone</span>  <span class="ms-val">MVC Bidirectional Mamba</span>
+          <span class="ms-key">Vocoder</span>   <span class="ms-val green" id="vocoder-status">HiFi-GAN BitLinear</span>
+          <span class="ms-key">Weights</span>   <span class="ms-val green" id="mvc-weights-status">BitLinear ternary</span>
+          <span class="ms-key">D_model</span>   <span class="ms-val accent" id="mvc-d">128</span>
+          <span class="ms-key">N_layers</span>  <span class="ms-val accent" id="mvc-l">2</span>
+          <span class="ms-key">Voc stages</span><span class="ms-val accent">3</span>
+          <span class="ms-key">N_mels</span>    <span class="ms-val accent">80</span>
+          <span class="ms-key">Sample rate</span><span class="ms-val accent">24000 Hz</span>
+          <span class="ms-key">Hop size</span>  <span class="ms-val accent">256</span>
+          <span class="ms-key">N_fft</span>     <span class="ms-val accent">1024</span>
+          <span class="ms-key">GL fallback</span><span class="ms-val dim" id="gl-fallback-status">standby</span>
+          <span class="ms-key">Pop2</span>      <span class="ms-val dim" id="pop2-status">not loaded</span>
+        </div>
+      </div>
+      <div class="rp-section" style="border-top:1px solid var(--border);padding-top:12px;">
+        <div class="rp-title">postMessage API</div>
+        <div style="font-size:10px;color:var(--dim);line-height:1.8;font-family:'Space Mono',monospace;">
+          <div style="color:var(--dim);margin-bottom:4px;">// embed in iframe, control from host:</div>
+          <div><span style="color:var(--accent);">speak</span> · stop · getStatus</div>
+          <div><span style="color:var(--accent);">getVoiceVec</span> · setVoiceVec</div>
+          <div><span style="color:var(--accent);">loadPop2</span> · loadPop2Url</div>
+          <div><span style="color:var(--accent);">exportPop2</span> · reset</div>
+          <div style="margin-top:6px;color:var(--dim);">// example:</div>
+          <div style="color:var(--text);word-break:break-all;">iframe.contentWindow</div>
+          <div style="color:var(--text);word-break:break-all;">.postMessage({</div>
+          <div style="color:var(--text);padding-left:8px;">target:<span style="color:var(--gold);">'omnivocal'</span>,</div>
+          <div style="color:var(--text);padding-left:8px;">action:<span style="color:var(--gold);">'speak'</span>,</div>
+          <div style="color:var(--text);padding-left:8px;">text:<span style="color:var(--gold);">'hello'</span></div>
+          <div style="color:var(--text);">}, <span style="color:var(--gold);">'*'</span>);</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pane: Log -->
+    <div class="rp-pane" id="pane-log" style="flex:1;min-height:0;">
+      <div style="padding:8px 16px;border-bottom:1px solid var(--border);font-size:10px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;flex-shrink:0;">System Log</div>
+      <div id="log" style="flex:1;overflow-y:auto;min-height:0;"></div>
+    </div>
+
+  </div>
+
+</main>
+
+<div class="footer-strip">
+  <span>OmniVocal v0.6-phase6 · ConsciousNode SoftWorks · Ed Interim / Vael Interim</span>
+  <span>browser-native · zero-dependency · xinu philosophy</span>
+</div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════
+   OMNIVOCAL PHASE 6
+   G2P · MVC Acoustic Model (d=128) · Mel Pipeline 24kHz
+   Neural Vocoder (HiFi-GAN BitLinear) · Learned Duration MLP
+   Pop Studio · .pop2 v1.0 I/O · Full postMessage API
+   Principled Base Init · FFT Voice Analysis · Learned Snake α
+   Tabbed UI · Playback Cursor · Mel Zoom
+   Kham (architect) · Ed Interim · Vael Interim
+   ConsciousNode SoftWorks · xinu philosophy
+   Ed Interim / Vael Interim · ConsciousNode SoftWorks
+   ═══════════════════════════════════════════════════════════════ */
+
+// ── CONFIG ────────────────────────────────────────────────────────────────
+const CFG = {
+  sr:       24000,
+  hop:      256,
+  n_fft:    1024,
+  n_mels:   80,
+  gl_iters: 24,
+};
+
+// ── LOG ───────────────────────────────────────────────────────────────────
+const LOG = (() => {
+  const el = () => document.getElementById('log');
+  const push = (cls, prefix, msg) => {
+    const d = document.createElement('div');
+    d.className = cls;
+    d.textContent = `${prefix} ${msg}`;
+    el().appendChild(d);
+    el().scrollTop = el().scrollHeight;
+    if (el().children.length > 300) el().removeChild(el().children[0]);
+  };
+  return {
+    ok:   m => push('log-ok',   '[OK]  ', m),
+    info: m => push('log-info', '[INF] ', m),
+    warn: m => push('log-warn', '[WRN] ', m),
+    err:  m => push('log-err',  '[ERR] ', m),
+    dim:  m => push('log-dim',  '···   ', m),
+  };
+})();
+
+function setSys(label, dotCls) {
+  document.getElementById('sys-label').textContent = label;
+  const d = document.getElementById('sys-dot');
+  d.className = 'status-dot ' + dotCls;
+}
+
+// ── MEL FILTERBANK ────────────────────────────────────────────────────────
+// 24kHz · 80 mel bands · N_FFT=1024
+let MEL_FILTERS = null;
+
+function buildMelFilters() {
+  const { sr, n_fft, n_mels } = CFG;
+  const nBins = n_fft / 2 + 1;
+  const hz2mel = hz => 2595 * Math.log10(1 + hz / 700);
+  const mel2hz = m => 700 * (Math.pow(10, m / 2595) - 1);
+  const melMin = hz2mel(0), melMax = hz2mel(sr / 2);
+  const mpts = Array.from({ length: n_mels + 2 }, (_, i) => melMin + (melMax - melMin) * i / (n_mels + 1));
+  const fpts = mpts.map(mel2hz);
+  const fftFreqs = Array.from({ length: nBins }, (_, i) => i * sr / n_fft);
+
+  // Bin each filter center point
+  const bpts = fpts.map(f => {
+    let best = 0, bd = Infinity;
+    fftFreqs.forEach((ff, bi) => { const d = Math.abs(ff - f); if (d < bd) { bd = d; best = bi; } });
+    return best;
+  });
+
+  const filters = new Float32Array(n_mels * nBins);
+  for (let m = 0; m < n_mels; m++) {
+    const lo = bpts[m], cen = bpts[m + 1], hi = bpts[m + 2];
+    for (let b = lo; b <= hi; b++) {
+      filters[m * nBins + b] = b <= cen
+        ? (b - lo) / Math.max(1, cen - lo)
+        : (hi - b) / Math.max(1, hi - cen);
+    }
+  }
+  MEL_FILTERS = filters;
+  LOG.ok(`Mel filterbank: ${n_mels} bands × ${nBins} bins @ ${sr}Hz`);
+}
+
+// ── STFT / ISTFT ──────────────────────────────────────────────────────────
+function stft(sig, nFrames, nBins, nFFT, hop) {
+  const re = new Float32Array(nFrames * nBins);
+  const im = new Float32Array(nFrames * nBins);
+  for (let f = 0; f < nFrames; f++) {
+    const st = f * hop;
+    for (let k = 0; k < nBins; k++) {
+      let r = 0, x = 0;
+      for (let n = 0; n < nFFT; n++) {
+        const s = (st + n < sig.length) ? sig[st + n] : 0;
+        const w = 0.5 - 0.5 * Math.cos(2 * Math.PI * n / (nFFT - 1)); // Hann
+        const a = 2 * Math.PI * k * n / nFFT;
+        r += s * w * Math.cos(a);
+        x -= s * w * Math.sin(a);
+      }
+      re[f * nBins + k] = r;
+      im[f * nBins + k] = x;
+    }
+  }
+  return { re, im };
+}
+
+function istft(re, im, nFrames, nBins, nFFT, hop) {
+  const nSamples = (nFrames + 1) * hop;
+  const out = new Float32Array(nSamples);
+  const ws  = new Float32Array(nSamples);
+  for (let i = 0; i < nFFT; i++) {
+    // precompute window inline
+  }
+  const win = new Float32Array(nFFT);
+  for (let i = 0; i < nFFT; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (nFFT - 1));
+
+  for (let f = 0; f < nFrames; f++) {
+    const fr = new Float32Array(nFFT);
+    for (let n = 0; n < nFFT; n++) {
+      let s = 0;
+      for (let k = 0; k < nBins; k++) {
+        const a = 2 * Math.PI * k * n / nFFT;
+        s += re[f * nBins + k] * Math.cos(a) - im[f * nBins + k] * Math.sin(a);
+      }
+      fr[n] = s / nFFT;
+    }
+    const st = f * hop;
+    for (let n = 0; n < nFFT; n++) {
+      if (st + n < nSamples) {
+        out[st + n] += fr[n] * win[n];
+        ws[st + n]  += win[n] * win[n];
+      }
+    }
+  }
+  for (let i = 0; i < nSamples; i++) {
+    if (ws[i] > 1e-8) out[i] /= ws[i];
+  }
+  return out;
+}
+
+// ── MEL SPECTROGRAM FROM PCM ──────────────────────────────────────────────
+function pcmToMel(pcm) {
+  const { sr, hop, n_fft, n_mels } = CFG;
+  const nBins   = n_fft / 2 + 1;
+  const nFrames = Math.floor((pcm.length - n_fft) / hop) + 1;
+  const mel     = new Float32Array(nFrames * n_mels);
+
+  for (let f = 0; f < nFrames; f++) {
+    const st = f * hop;
+    // Single-frame DFT
+    const power = new Float32Array(nBins);
+    for (let k = 0; k < nBins; k++) {
+      let r = 0, x = 0;
+      for (let n = 0; n < n_fft; n++) {
+        const s = (st + n < pcm.length) ? pcm[st + n] : 0;
+        const w = 0.5 - 0.5 * Math.cos(2 * Math.PI * n / (n_fft - 1));
+        const a = 2 * Math.PI * k * n / n_fft;
+        r += s * w * Math.cos(a);
+        x -= s * w * Math.sin(a);
+      }
+      power[k] = r * r + x * x;
+    }
+    for (let m = 0; m < n_mels; m++) {
+      let e = 0;
+      for (let b = 0; b < nBins; b++) e += MEL_FILTERS[m * nBins + b] * power[b];
+      mel[f * n_mels + m] = Math.log(Math.max(e, 1e-9));
+    }
+  }
+  return { mel, nFrames };
+}
+
+// ── MEL → LINEAR SPECTROGRAM ──────────────────────────────────────────────
+function melToLinSpec(linMel, nF, nM, nB) {
+  if (!MEL_FILTERS) buildMelFilters();
+  const cs = new Float32Array(nB);
+  for (let m = 0; m < nM; m++)
+    for (let b = 0; b < nB; b++) cs[b] += MEL_FILTERS[m * nB + b];
+  const ls = new Float32Array(nF * nB);
+  for (let f = 0; f < nF; f++)
+    for (let b = 0; b < nB; b++) {
+      let s = 0;
+      for (let m = 0; m < nM; m++) s += MEL_FILTERS[m * nB + b] * linMel[f * nM + m];
+      ls[f * nB + b] = Math.max(0, cs[b] > 0 ? s / (cs[b] + 1e-9) : 0);
+    }
+  return ls;
+}
+
+// ── GRIFFIN-LIM VOCODER (fallback — switch via STATE.useNeuralVocoder) ────
+function griffinLim(melSpec, nFrames, nIter) {
+  const { sr, hop, n_fft, n_mels } = CFG;
+  const nBins    = n_fft / 2 + 1;
+  const nSamples = (nFrames + 1) * hop;
+
+  // Exp mel → linear magnitude
+  const linMel = new Float32Array(nFrames * n_mels);
+  for (let i = 0; i < linMel.length; i++) linMel[i] = Math.exp(Math.min(melSpec[i], 10));
+  const linSpec = melToLinSpec(linMel, nFrames, n_mels, nBins);
+
+  // Random phase init
+  let phase = new Float32Array(nFrames * nBins);
+  for (let i = 0; i < phase.length; i++) phase[i] = Math.random() * 2 * Math.PI;
+
+  let signal = new Float32Array(nSamples);
+
+  for (let iter = 0; iter < nIter; iter++) {
+    // Reconstruct complex spectrogram with target magnitude and current phase
+    const re = new Float32Array(nFrames * nBins);
+    const im = new Float32Array(nFrames * nBins);
+    for (let f = 0; f < nFrames; f++) {
+      for (let b = 0; b < nBins; b++) {
+        const mg = Math.sqrt(Math.max(0, linSpec[f * nBins + b]));
+        re[f * nBins + b] = mg * Math.cos(phase[f * nBins + b]);
+        im[f * nBins + b] = mg * Math.sin(phase[f * nBins + b]);
+      }
+    }
+    signal = istft(re, im, nFrames, nBins, n_fft, hop);
+    if (iter < nIter - 1) {
+      // Re-analyze to get consistent phase
+      const { re: r2, im: i2 } = stft(signal, nFrames, nBins, n_fft, hop);
+      for (let f = 0; f < nFrames; f++)
+        for (let b = 0; b < nBins; b++)
+          phase[f * nBins + b] = Math.atan2(i2[f * nBins + b], r2[f * nBins + b]);
+    }
+  }
+  return signal;
+}
+
+// ── NEURAL VOCODER — HiFi-GAN style, BitLinear ternary, 3 upsampling stages
+// AdaLN conditioned on 10-dim voice vector.
+// Input:  mel spectrogram Float32Array[nFrames × 80], voiceVec Float32Array[10]
+// Output: PCM Float32Array @ 24kHz
+//
+// Architecture:
+//   mel[F×80] → VocInput[F×VOC_D]
+//   3 × UpsampleBlock (×8 each → ×512 total, 24kHz/256*512 ≈ 48kHz headroom, clipped to target)
+//   Each block: BitLinear expand → AdaLN(voiceVec) → snake activation → BitLinear project
+//   → ResStack (3 dilated conv-style residual layers via BitLinear)
+//   Final: BitLinear → tanh → PCM
+//
+// Snake activation: x + sin²(x) — learnable via alpha init, here fixed α=1
+// learned α per channel implemented in Phase 4.
+// ─────────────────────────────────────────────────────────────────────────
+
+const VOC = {
+  D:       64,    // vocoder hidden dim — smaller than MVC, speed-first
+  STAGES:  3,     // upsampling stages
+  UP:      8,     // upsample factor per stage (8³ = 512 → ~47ms/frame at 24kHz)
+  RES_K:   3,     // residual stack depth per stage
+};
+
+// ── PRINCIPLED BASE INITIALIZATION ───────────────────────────────────────
+// Instead of random He init, set master weights to structured values that
+// quantize to meaningful ternary patterns. Goal: MVC and vocoder start as
+// approximate identity/passthrough rather than noise.
+
+function initNearIdentity(layer, strength = 0.1) {
+  // Initialize a BitLinear layer so its weight matrix approximates
+  // a scaled identity (or near-zero for non-square). This means
+  // the layer initially passes input through with small perturbation
+  // rather than mapping to noise.
+  const { inDim, outDim } = layer;
+  const w = layer.weight;
+  const min = Math.min(inDim, outDim);
+  // Start near zero
+  w.fill(0);
+  // Set diagonal (or near-diagonal) to small positive value
+  for (let i = 0; i < min; i++) {
+    w[i * inDim + (i % inDim)] = strength * (0.8 + Math.random() * 0.4);
+  }
+  // Small noise everywhere else
+  const noise = strength * 0.05;
+  for (let i = 0; i < w.length; i++) {
+    w[i] += (Math.random() - 0.5) * noise;
+  }
+  layer.dirty = true;
+}
+
+function initNearZero(layer, noise = 0.01) {
+  // For AdaLN conditioning layers: start near zero so voice conditioning
+  // begins as a small perturbation (scale ≈ 0, shift ≈ 0 → identity AdaLN)
+  const w = layer.weight;
+  for (let i = 0; i < w.length; i++) w[i] = (Math.random() - 0.5) * noise;
+  layer.dirty = true;
+}
+
+function initMelProjection(layer, nMels) {
+  // W_out in MVC: should roughly spread hidden dim → mel bands
+  // Initialize with small structured values — each output mel band
+  // gets a slight preference for a frequency-ordered input channel
+  const { inDim, outDim } = layer;
+  const w = layer.weight;
+  for (let o = 0; o < outDim; o++) {
+    const centerIn = Math.floor(o / outDim * inDim);
+    for (let i = 0; i < inDim; i++) {
+      const dist = Math.abs(i - centerIn) / inDim;
+      w[o * inDim + i] = (0.15 - dist * 0.1) + (Math.random() - 0.5) * 0.03;
+    }
+  }
+  layer.dirty = true;
+}
+
+function applyPrincipledBaseInit(mvc, vocoder) {
+  // MVC: SSM matrices near identity, output near mel-projection, AdaLN near zero
+  for (let l = 0; l < mvc.nLayers; l++) {
+    initNearIdentity(mvc.A_log[l], 0.12);
+    initNearIdentity(mvc.B[l],     0.08);
+    initNearIdentity(mvc.C[l],     0.08);
+    initNearIdentity(mvc.Wup[l],   0.06);
+    initNearIdentity(mvc.Wdown[l], 0.06);
+    initNearZero(mvc.adaln_shift[l], 0.008); // AdaLN near identity
+    initNearZero(mvc.adaln_scale[l], 0.008);
+  }
+  initMelProjection(mvc.W_out, mvc.nMels);
+
+  // Vocoder: passthrough-biased init
+  initNearIdentity(vocoder.W_in, 0.1);
+  for (const stage of [vocoder.stage0, vocoder.stage1, vocoder.stage2]) {
+    initNearIdentity(stage.Wup,   0.07);
+    initNearIdentity(stage.Wdown, 0.07);
+    initNearZero(stage.adaln_shift, 0.008);
+    initNearZero(stage.adaln_scale, 0.008);
+    for (const rb of stage.resBlocks) {
+      initNearIdentity(rb.W1, 0.08);
+      initNearIdentity(rb.W2, 0.04); // second layer smaller — residual
+    }
+  }
+  // W_out: maps D/2 → 1 PCM. Init to small uniform so output starts quiet
+  const wo = vocoder.W_out.weight;
+  for (let i = 0; i < wo.length; i++) wo[i] = (Math.random() - 0.5) * 0.05;
+  vocoder.W_out.dirty = true;
+}
+
+// ── COOLEY-TUKEY FFT (replaces O(N²) DFT in voice analysis) ─────────────
+function fft(re, im) {
+  // In-place radix-2 Cooley-Tukey FFT. re/im: Float32Array, length must be power of 2.
+  const N = re.length;
+  // Bit-reversal permutation
+  let j = 0;
+  for (let i = 1; i < N; i++) {
+    let bit = N >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      [re[i], re[j]] = [re[j], re[i]];
+      [im[i], im[j]] = [im[j], im[i]];
+    }
+  }
+  // FFT butterfly
+  for (let len = 2; len <= N; len <<= 1) {
+    const ang = -2 * Math.PI / len;
+    const wRe = Math.cos(ang), wIm = Math.sin(ang);
+    for (let i = 0; i < N; i += len) {
+      let curRe = 1, curIm = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const uRe = re[i+k],       uIm = im[i+k];
+        const vRe = re[i+k+len/2], vIm = im[i+k+len/2];
+        const tRe = curRe*vRe - curIm*vIm;
+        const tIm = curRe*vIm + curIm*vRe;
+        re[i+k]         = uRe + tRe; im[i+k]         = uIm + tIm;
+        re[i+k+len/2]   = uRe - tRe; im[i+k+len/2]   = uIm - tIm;
+        const newCurRe = curRe*wRe - curIm*wIm;
+        curIm = curRe*wIm + curIm*wRe; curRe = newCurRe;
+      }
+    }
+  }
+}
+
+function fftMagnitudes(signal, fftSize) {
+  // Returns magnitude spectrum (half), using Hann window, power of 2 fftSize
+  const re = new Float32Array(fftSize);
+  const im = new Float32Array(fftSize);
+  const len = Math.min(signal.length, fftSize);
+  for (let i = 0; i < len; i++) {
+    re[i] = signal[i] * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / fftSize));
+  }
+  fft(re, im);
+  const mags = new Float32Array(fftSize / 2);
+  for (let k = 0; k < fftSize / 2; k++) mags[k] = Math.sqrt(re[k]*re[k] + im[k]*im[k]);
+  return mags;
+}
+
+// ── SNAKE ACTIVATION with learned α per channel ───────────────────────────
+// α stored in a Float32Array; init to 1.0. Updated during conditioning training.
+function snakeWithAlpha(x, alpha) {
+  const out = new Float32Array(x.length);
+  for (let i = 0; i < x.length; i++) {
+    const a = alpha ? Math.max(0.1, alpha[i % alpha.length]) : 1.0;
+    const s = Math.sin(a * x[i]);
+    out[i] = x[i] + (s * s) / a;
+  }
+  return out;
+}
+
+// Snake activation: x + (1/α)·sin²(αx), α=1 fixed (fallback)
+function snake(x) {
+  const out = new Float32Array(x.length);
+  for (let i = 0; i < x.length; i++) {
+    const s = Math.sin(x[i]);
+    out[i] = x[i] + s * s;
+  }
+  return out;
+}
+
+// Linear interpolation upsampler (sample-accurate, no aliasing artifacts)
+function upsampleLinear(x, factor) {
+  const out = new Float32Array(x.length * factor);
+  for (let i = 0; i < x.length - 1; i++) {
+    for (let j = 0; j < factor; j++) {
+      out[i * factor + j] = x[i] + (x[i + 1] - x[i]) * j / factor;
+    }
+  }
+  // Fill last segment
+  for (let j = 0; j < factor; j++) out[(x.length - 1) * factor + j] = x[x.length - 1];
+  return out;
+}
+
+class VocoderResBlock {
+  constructor(dim, dilation) {
+    this.dim      = dim;
+    this.dilation = dilation;
+    this.W1 = new BitLinear(dim, dim);
+    this.W2 = new BitLinear(dim, dim);
+    this.ln = new LayerNorm(dim);
+    this.alpha = new Float32Array(dim).fill(1.0); // learned snake α per channel
+  }
+  forward(x, shift, scale) {
+    const normed = this.ln.forward(x);
+    const mod = new Float32Array(this.dim);
+    for (let i = 0; i < this.dim; i++) mod[i] = normed[i] * (1 + scale[i] * 0.1) + shift[i] * 0.05;
+    const h1  = snakeWithAlpha(this.W1.forward(mod), this.alpha);
+    const h2  = this.W2.forward(h1);
+    const out = new Float32Array(this.dim);
+    for (let i = 0; i < this.dim; i++) out[i] = x[i] + h2[i];
+    return out;
+  }
+}
+
+class VocoderUpsampleBlock {
+  constructor(inDim, outDim, voiceDim) {
+    this.inDim    = inDim;
+    this.outDim   = outDim;
+    this.voiceDim = voiceDim;
+    // Expand then project
+    this.Wup   = new BitLinear(inDim,  outDim * 2);
+    this.Wdown = new BitLinear(outDim * 2, outDim);
+    // AdaLN conditioning
+    this.adaln_shift = new BitLinear(voiceDim, outDim);
+    this.adaln_scale = new BitLinear(voiceDim, outDim);
+    this.ln = new LayerNorm(inDim);
+    // Residual stack
+    this.resBlocks = [
+      new VocoderResBlock(outDim, 1),
+      new VocoderResBlock(outDim, 2),
+      new VocoderResBlock(outDim, 4),
+    ];
+  }
+  // frameSeq: Float32Array[nFrames × inDim]
+  // voiceVec: Float32Array[voiceDim]
+  // returns:  Float32Array[nFrames × outDim]
+  forward(frameSeq, nFrames, voiceVec) {
+    const shift = this.adaln_shift.forward(voiceVec);
+    const scale = this.adaln_scale.forward(voiceVec);
+    const out   = new Float32Array(nFrames * this.outDim);
+
+    for (let f = 0; f < nFrames; f++) {
+      const xin    = frameSeq.subarray(f * this.inDim, (f + 1) * this.inDim);
+      const normed = this.ln.forward(xin);
+      const exp    = this.Wup.forward(normed);
+      const gated  = new Float32Array(this.outDim);
+      for (let i = 0; i < this.outDim; i++) {
+        // GLU-style gating: snake(first half) * sigmoid(second half)
+        const s = Math.sin(exp[i]);
+        const snk = exp[i] + s * s;
+        const sig = 1 / (1 + Math.exp(-exp[this.outDim + i]));
+        gated[i]  = snk * sig;
+      }
+      let h = this.Wdown.forward(gated);
+      // Residual stack with AdaLN
+      for (const block of this.resBlocks) h = block.forward(h, shift, scale);
+      out.set(h, f * this.outDim);
+    }
+    return out;
+  }
+}
+
+class NeuralVocoder {
+  constructor(nMels = 80, voiceDim = 10) {
+    this.nMels    = nMels;
+    this.voiceDim = voiceDim;
+    const D       = VOC.D;
+
+    // Input projection: mel → vocoder hidden
+    this.W_in  = new BitLinear(nMels, D);
+    this.ln_in = new LayerNorm(nMels);
+
+    // 3 upsampling stages: D → D → D/2 → D/4
+    // (narrowing keeps output sharp, avoids muddy low-freq over-smoothing)
+    this.stage0 = new VocoderUpsampleBlock(D,      D,     voiceDim);
+    this.stage1 = new VocoderUpsampleBlock(D,      D,     voiceDim);
+    this.stage2 = new VocoderUpsampleBlock(D,      D / 2, voiceDim);
+
+    // stages array: iterable by Vael's getVocoderConditioningLayers()
+    this.stages = [this.stage0, this.stage1, this.stage2];
+
+    // Output: D/2 → 1 (PCM sample per upsampled step)
+    this.W_out  = new BitLinear(D / 2, 1);
+    this.ln_out = new LayerNorm(D / 2);
+  }
+
+  // mel: Float32Array[nFrames × 80]
+  // voiceVec: Float32Array[10]
+  // returns: Float32Array[nFrames × UP³] — raw PCM before trim
+  forward(mel, nFrames, voiceVec) {
+    const D  = VOC.D;
+    const UP = VOC.UP;
+
+    // 1. Project mel frames → hidden
+    const hidden = new Float32Array(nFrames * D);
+    for (let f = 0; f < nFrames; f++) {
+      const mf  = mel.subarray(f * this.nMels, (f + 1) * this.nMels);
+      const lnf = this.ln_in.forward(mf);
+      const h   = this.W_in.forward(lnf);
+      hidden.set(h, f * D);
+    }
+
+    // 2. Stage 0 — frame-level, no upsampling yet (feature transform)
+    const s0out = this.stage0.forward(hidden, nFrames, voiceVec);
+
+    // 3. Stage 1 — upsample ×UP via linear interp then transform
+    //    We interleave: upsample the sequence, then run the block
+    const nF1    = nFrames * UP;
+    const s0flat = new Float32Array(nF1 * D);
+    for (let d = 0; d < D; d++) {
+      // Extract channel d across all frames, upsample, scatter back
+      const ch = new Float32Array(nFrames);
+      for (let f = 0; f < nFrames; f++) ch[f] = s0out[f * D + d];
+      const up = upsampleLinear(ch, UP);
+      for (let f = 0; f < nF1; f++) s0flat[f * D + d] = up[f];
+    }
+    const s1out = this.stage1.forward(s0flat, nF1, voiceVec);
+
+    // 4. Stage 2 — upsample ×UP again, project to D/2
+    const nF2    = nF1 * UP;
+    const s1flat = new Float32Array(nF2 * D);
+    for (let d = 0; d < D; d++) {
+      const ch = new Float32Array(nF1);
+      for (let f = 0; f < nF1; f++) ch[f] = s1out[f * D + d];
+      const up = upsampleLinear(ch, UP);
+      for (let f = 0; f < nF2; f++) s1flat[f * D + d] = up[f];
+    }
+    const s2out = this.stage2.forward(s1flat, nF2, voiceVec); // [nF2 × D/2]
+
+    // 5. Output projection → PCM
+    const D2  = D / 2;
+    const pcm = new Float32Array(nF2);
+    for (let f = 0; f < nF2; f++) {
+      const h   = s2out.subarray(f * D2, (f + 1) * D2);
+      const lnh = this.ln_out.forward(h);
+      const v   = this.W_out.forward(lnh);
+      pcm[f]    = Math.tanh(v[0]);
+    }
+    return pcm; // trim to target length in caller
+  }
+
+  getAllLayers() {
+    const layers = [this.W_in, this.W_out];
+    const addBlock = b => {
+      layers.push(b.Wup, b.Wdown, b.adaln_shift, b.adaln_scale);
+      for (const r of b.resBlocks) layers.push(r.W1, r.W2);
+    };
+    addBlock(this.stage0);
+    addBlock(this.stage1);
+    addBlock(this.stage2);
+    return layers;
+  }
+
+  getAllAlphas() {
+    // Returns all learned snake α arrays for serialization
+    const alphas = [];
+    for (const stage of [this.stage0, this.stage1, this.stage2]) {
+      for (const rb of stage.resBlocks) alphas.push(rb.alpha);
+    }
+    return alphas;
+  }
+}
+
+// ── TMAC MICROKERNEL (ternary GEMM) ───────────────────────────────────────
+class TMAC {
+  static UNPACK_TABLE = new Int8Array(81 * 4);
+  static { TMAC._initTable(); }
+  static _initTable() {
+    for (let i = 0; i < 81; i++) {
+      let rem = i;
+      TMAC.UNPACK_TABLE[i*4]   = (rem % 3) - 1; rem = Math.floor(rem / 3);
+      TMAC.UNPACK_TABLE[i*4+1] = (rem % 3) - 1; rem = Math.floor(rem / 3);
+      TMAC.UNPACK_TABLE[i*4+2] = (rem % 3) - 1; rem = Math.floor(rem / 3);
+      TMAC.UNPACK_TABLE[i*4+3] = (rem % 3) - 1;
+    }
+  }
+  static packTernary(t0, t1, t2, t3) {
+    return (t0+1) + 3*(t1+1) + 9*(t2+1) + 27*(t3+1);
+  }
+  static quantizeWeights(masterWeights, packedOut) {
+    const n = masterWeights.length, blocks = Math.ceil(n / 4);
+    let sumAbs = 0;
+    for (let i = 0; i < n; i++) sumAbs += Math.abs(masterWeights[i]);
+    const gamma = (sumAbs / n) || 1e-8, invGamma = 1 / gamma;
+    for (let b = 0; b < blocks; b++) {
+      const base = b * 4;
+      const t0 = base   < n ? Math.max(-1, Math.min(1, Math.round(masterWeights[base]   * invGamma))) : 0;
+      const t1 = base+1 < n ? Math.max(-1, Math.min(1, Math.round(masterWeights[base+1] * invGamma))) : 0;
+      const t2 = base+2 < n ? Math.max(-1, Math.min(1, Math.round(masterWeights[base+2] * invGamma))) : 0;
+      const t3 = base+3 < n ? Math.max(-1, Math.min(1, Math.round(masterWeights[base+3] * invGamma))) : 0;
+      packedOut[b] = TMAC.packTernary(t0, t1, t2, t3);
+    }
+    return gamma;
+  }
+  static execute(packedWeights, input, outDim, inDim, gamma, outputArr, scratchLut) {
+    const blocksPerRow = Math.ceil(inDim / 4);
+    for (let b = 0; b < blocksPerRow; b++) {
+      const base = b * 4;
+      const v0 = base   < inDim ? input[base]   : 0;
+      const v1 = base+1 < inDim ? input[base+1] : 0;
+      const v2 = base+2 < inDim ? input[base+2] : 0;
+      const v3 = base+3 < inDim ? input[base+3] : 0;
+      const lutOffset = b * 81;
+      for (let i = 0; i < 81; i++) {
+        const uBase = i * 4;
+        scratchLut[lutOffset + i] =
+          TMAC.UNPACK_TABLE[uBase]*v0 + TMAC.UNPACK_TABLE[uBase+1]*v1 +
+          TMAC.UNPACK_TABLE[uBase+2]*v2 + TMAC.UNPACK_TABLE[uBase+3]*v3;
+      }
+    }
+    for (let o = 0; o < outDim; o++) {
+      let acc = 0;
+      const rowBase = o * blocksPerRow;
+      for (let b = 0; b < blocksPerRow; b++) acc += scratchLut[b * 81 + packedWeights[rowBase + b]];
+      outputArr[o] = acc * gamma;
+    }
+  }
+}
+
+// ── BITLINEAR ─────────────────────────────────────────────────────────────
+class BitLinear {
+  constructor(inDim, outDim) {
+    this.inDim = inDim; this.outDim = outDim;
+    // Aliases used by Vael's .pop2 serializer
+    this.inFeatures  = inDim;
+    this.outFeatures = outDim;
+    this.weight = new Float32Array(outDim * inDim);
+    this.grad   = new Float32Array(outDim * inDim);
+    this.packed = new Uint8Array(Math.ceil((outDim * inDim) / 4));
+    this.gamma  = 1.0; this.dirty = true;
+    // scale: per-layer Float32Array(1) — wraps gamma for .pop2 serialization
+    this.scale  = new Float32Array([1.0]);
+    this.lutScratch = new Float32Array(Math.ceil(inDim / 4) * 81);
+    const initScale = Math.sqrt(2.0 / inDim); // He init
+    for (let i = 0; i < this.weight.length; i++) this.weight[i] = (Math.random()*2-1) * initScale;
+  }
+  pack() {
+    if (this.dirty) {
+      this.gamma = TMAC.quantizeWeights(this.weight, this.packed);
+      this.scale[0] = this.gamma; // keep scale in sync
+      this.dirty = false;
+    }
+  }
+  forward(x) {
+    this.pack();
+    const out = new Float32Array(this.outDim);
+    TMAC.execute(this.packed, x, this.outDim, this.inDim, this.gamma, out, this.lutScratch);
+    return out;
+  }
+  zeroGrad() { this.grad.fill(0); }
+  markDirty() { this.dirty = true; }
+}
+
+// ── LAYER NORM ────────────────────────────────────────────────────────────
+class LayerNorm {
+  constructor(dim) {
+    this.dim = dim;
+    this.weight = new Float32Array(dim).fill(1.0);
+    this.bias   = new Float32Array(dim).fill(0.0);
+  }
+  forward(x) {
+    let mean = 0, v = 0;
+    for (let i = 0; i < this.dim; i++) mean += x[i];
+    mean /= this.dim;
+    for (let i = 0; i < this.dim; i++) v += (x[i] - mean) ** 2;
+    const rstd = 1.0 / Math.sqrt(v / this.dim + 1e-5);
+    const out = new Float32Array(this.dim);
+    for (let i = 0; i < this.dim; i++)
+      out[i] = (x[i] - mean) * rstd * this.weight[i] + this.bias[i];
+    return out;
+  }
+}
+
+// ── DURATION MODEL — learned per-phoneme duration, 2-layer BitLinear MLP ──
+// Input:  phoneme_idx (→ embedding) + voice context [mora_timing, register, f0_center]
+// Output: duration in frames (log-domain, softplus activation)
+// Init:   biased toward phoneme table priors so it starts sane
+//
+// This replaces the hardcoded PHONEMES[p].dur table for frame allocation.
+// The table values remain as a prior floor: predicted + 0.4 × table_prior
+// so the model can't collapse to silence even at random init.
+// ─────────────────────────────────────────────────────────────────────────
+
+const DUR = {
+  EMBED_DIM:   32,   // phoneme embedding dimension
+  HIDDEN_DIM:  48,   // hidden layer size
+  VOICE_CTXT:  3,    // mora_timing, register, f0_center from voiceVec
+  N_PHONEMES:  50,   // phoneme index range
+};
+
+class DurationModel {
+  constructor() {
+    const E = DUR.EMBED_DIM, H = DUR.HIDDEN_DIM, V = DUR.VOICE_CTXT;
+    // Phoneme embedding table: N_PHONEMES × E (stored flat)
+    this.embedTable = new Float32Array(DUR.N_PHONEMES * E);
+    // Layer 1: (E + V) → H
+    this.W1  = new BitLinear(E + V, H);
+    this.ln1 = new LayerNorm(H);
+    // Layer 2: H → 1 (log-duration scalar)
+    this.W2  = new BitLinear(H, 1);
+    // Learned global rate bias (scalar, unconstrained — positive = slower)
+    this.rateBias = new Float32Array([0.0]);
+    this._initEmbeddings();
+    this._initWeights();
+  }
+
+  _initEmbeddings() {
+    // Sinusoidal init: each phoneme gets a unique but structured embedding
+    // Vowels, consonants, pauses cluster naturally in sinusoidal space
+    const E = DUR.EMBED_DIM;
+    for (let p = 0; p < DUR.N_PHONEMES; p++) {
+      for (let d = 0; d < E; d++) {
+        this.embedTable[p * E + d] = d % 2 === 0
+          ? Math.sin(p * 0.4 * (d / 2 + 1) * 0.13) * 0.3
+          : Math.cos(p * 0.4 * (Math.floor(d / 2) + 1) * 0.13) * 0.3;
+      }
+    }
+  }
+
+  _initWeights() {
+    // W1: He init (default) — already done in BitLinear constructor
+    // W2: init toward predicting log(~100ms in frames)
+    // At 24kHz/256hop, 100ms ≈ 9.4 frames → log(9.4) ≈ 2.24
+    // Bias W2 output upward so early predictions aren't near-zero
+    for (let i = 0; i < this.W2.weight.length; i++) {
+      this.W2.weight[i] = 0.05 + (Math.random() - 0.5) * 0.02;
+    }
+    this.W2.dirty = true;
+  }
+
+  // Returns predicted duration in frames for one phoneme
+  // phIdx: int, voiceVec: Float32Array[10], rateMul: float (user rate slider)
+  predictFrames(phIdx, voiceVec, rateMul = 1.0) {
+    const E = DUR.EMBED_DIM;
+    const pidSafe = Math.max(0, Math.min(DUR.N_PHONEMES - 1, phIdx));
+
+    // Phoneme embedding
+    const emb = this.embedTable.subarray(pidSafe * E, (pidSafe + 1) * E);
+
+    // Voice context: mora_timing[6], register[8], f0_center[9]
+    const ctx = new Float32Array([voiceVec[6], voiceVec[8], voiceVec[9]]);
+
+    // Concat → Layer 1 → LayerNorm → snake activation → Layer 2
+    const inp = new Float32Array(E + DUR.VOICE_CTXT);
+    inp.set(emb, 0);
+    inp.set(ctx, E);
+
+    const h1  = this.W1.forward(inp);
+    const ln1 = this.ln1.forward(h1);
+    // Snake activation on hidden layer
+    const act = new Float32Array(ln1.length);
+    for (let i = 0; i < ln1.length; i++) {
+      const s = Math.sin(ln1[i]);
+      act[i] = ln1[i] + s * s;
+    }
+    const logDur = this.W2.forward(act)[0] + this.rateBias[0];
+
+    // Softplus: log(1 + exp(x)) — smooth positive output
+    const durFrames = Math.log1p(Math.exp(Math.min(logDur, 10)));
+
+    // Apply user rate multiplier and clamp to sane range
+    return Math.max(1, Math.round(durFrames / rateMul));
+  }
+
+  // Predict full sequence: returns Int32Array of per-phoneme frame counts
+  // phIdxs: int[], voiceVec: Float32Array[10], rateMul: float
+  // tablePrior: Float32Array — table-based durations in frames (fallback prior)
+  predictSequence(phIdxs, voiceVec, rateMul, tablePrior) {
+    const counts = new Int32Array(phIdxs.length);
+    for (let i = 0; i < phIdxs.length; i++) {
+      const neural  = this.predictFrames(phIdxs[i], voiceVec, rateMul);
+      // Blend: 60% neural, 40% table prior for stability at random init
+      // As training progresses this ratio should shift toward neural
+      const prior   = tablePrior ? Math.max(1, Math.round(tablePrior[i])) : neural;
+      counts[i]     = Math.max(1, Math.round(neural * 0.6 + prior * 0.4));
+    }
+    return counts;
+  }
+
+  // For .pop2 serialization
+  getLayers() { return [this.W1, this.W2]; }
+}
+
+// ── MVC ACOUSTIC MODEL (Bidirectional Mamba + AdaLN, d=128) ──────────────
+// phoneme embeddings → mel spectrogram, conditioned on 10-dim voice vector
+class MVCModel {
+  constructor(dModel = 128, nLayers = 2, nMels = 80, voiceDim = 10) {
+    this.dModel   = dModel;
+    this.nLayers  = nLayers;
+    this.nMels    = nMels;
+    this.voiceDim = voiceDim;
+
+    // Per-layer SSM matrices (Mamba-style)
+    this.A_log        = Array.from({ length: nLayers }, () => new BitLinear(dModel, dModel));
+    this.B            = Array.from({ length: nLayers }, () => new BitLinear(dModel, dModel));
+    this.C            = Array.from({ length: nLayers }, () => new BitLinear(dModel, dModel));
+    this.Wup          = Array.from({ length: nLayers }, () => new BitLinear(dModel, dModel * 2));
+    this.Wdown        = Array.from({ length: nLayers }, () => new BitLinear(dModel * 2, dModel));
+    // AdaLN conditioning: voice vector → scale/shift per layer
+    this.adaln_shift  = Array.from({ length: nLayers }, () => new BitLinear(voiceDim, dModel));
+    this.adaln_scale  = Array.from({ length: nLayers }, () => new BitLinear(voiceDim, dModel));
+    // Output projection
+    this.W_out  = new BitLinear(dModel, nMels);
+    this.ln_in  = new LayerNorm(dModel);
+  }
+
+  // voiceVec: Float32Array[10], phonemeIdxs: int[], nFrames: int
+  forward(phonemeIdxs, nFrames, voiceVec) {
+    const D = this.dModel, NM = this.nMels, nPh = phonemeIdxs.length;
+
+    // Phoneme embedding — sinusoidal, stable across forward passes
+    let seq = new Float32Array(nPh * D);
+    for (let i = 0; i < nPh; i++) {
+      const pid = phonemeIdxs[i];
+      for (let d = 0; d < D; d++) {
+        // Mix sin/cos for richer embedding
+        seq[i*D+d] = (d % 2 === 0)
+          ? Math.sin(pid * 0.3 * (d/2 + 1) * 0.07) * 0.2
+          : Math.cos(pid * 0.3 * (Math.floor(d/2) + 1) * 0.07) * 0.2;
+      }
+    }
+
+    for (let layer = 0; layer < this.nLayers; layer++) {
+      const shift = this.adaln_shift[layer].forward(voiceVec);
+      const scale = this.adaln_scale[layer].forward(voiceVec);
+
+      // Forward SSM
+      const fwd = new Float32Array(nPh * D);
+      let h = new Float32Array(D);
+      for (let t = 0; t < nPh; t++) {
+        const xin  = seq.subarray(t*D, (t+1)*D);
+        const gate  = this.Wup[layer].forward(xin);
+        const xg    = gate.subarray(0, D);
+        const sg    = gate.subarray(D);
+        const dB    = this.B[layer].forward(xg);
+        const Av    = this.A_log[layer].forward(xg);
+        for (let i = 0; i < D; i++) {
+          const dA = Math.exp(-Math.exp(Math.max(-8, Math.min(0, Av[i]))));
+          h[i] = dA * h[i] + dB[i];
+        }
+        const y = this.C[layer].forward(h);
+        for (let i = 0; i < D; i++) {
+          const sig = 1 / (1 + Math.exp(-sg[i]));
+          fwd[t*D+i] = (y[i] * (1 + scale[i] * 0.1) + shift[i] * 0.05) * sig;
+        }
+      }
+
+      // Backward SSM (bidirectional)
+      const bwd = new Float32Array(nPh * D);
+      h = new Float32Array(D);
+      for (let t = nPh - 1; t >= 0; t--) {
+        const xin  = seq.subarray(t*D, (t+1)*D);
+        const gate  = this.Wup[layer].forward(xin);
+        const xg    = gate.subarray(0, D);
+        const sg    = gate.subarray(D);
+        const dB    = this.B[layer].forward(xg);
+        const Av    = this.A_log[layer].forward(xg);
+        for (let i = 0; i < D; i++) {
+          const dA = Math.exp(-Math.exp(Math.max(-8, Math.min(0, Av[i]))));
+          h[i] = dA * h[i] + dB[i];
+        }
+        const y = this.C[layer].forward(h);
+        for (let i = 0; i < D; i++) {
+          const sig = 1 / (1 + Math.exp(-sg[i]));
+          bwd[t*D+i] = (y[i] * (1 + scale[i] * 0.1) + shift[i] * 0.05) * sig;
+        }
+      }
+
+      // Merge + residual
+      const next = new Float32Array(nPh * D);
+      for (let i = 0; i < nPh * D; i++) next[i] = seq[i] + (fwd[i] + bwd[i]) * 0.5;
+      seq = next;
+    }
+
+    // ── DURATION EXPANSION (learned DurationModel) ────────────────────────
+    // Each phoneme gets a predicted frame count from the MLP.
+    // We expand the phoneme sequence to nFrames total, distributing
+    // frames proportionally to predicted durations.
+    // If DurationModel isn't initialized yet, fall back to uniform expansion.
+    let frameCounts;
+    if (STATE && STATE.durModel) {
+      // Build table prior in frames for blending
+      const tablePrior = new Float32Array(nPh);
+      for (let i = 0; i < nPh; i++) {
+        const phKey = Object.keys(PHONEMES).find(k => PHONEMES[k].idx === phonemeIdxs[i]);
+        const durMs = phKey ? PHONEMES[phKey].dur : 80;
+        tablePrior[i] = durMs / 1000 * CFG.sr / CFG.hop;
+      }
+      // Rate multiplier pulled from voice mora_timing for expressiveness
+      const rateMul = 0.7 + voiceVec[6] * 0.6; // mora_timing → 0.7x–1.3x
+      frameCounts = STATE.durModel.predictSequence(phonemeIdxs, voiceVec, rateMul, tablePrior);
+    } else {
+      // Uniform fallback
+      frameCounts = new Int32Array(nPh).fill(Math.max(1, Math.round(nFrames / Math.max(nPh, 1))));
+    }
+
+    // Scale frame counts to exactly nFrames total
+    const totalPredicted = frameCounts.reduce((s, c) => s + c, 0);
+    const scale_f = nFrames / Math.max(totalPredicted, 1);
+    let runningTotal = 0;
+    const scaledCounts = new Int32Array(nPh);
+    for (let i = 0; i < nPh; i++) {
+      const target = Math.round((runningTotal + frameCounts[i]) * scale_f) - Math.round(runningTotal * scale_f);
+      scaledCounts[i] = Math.max(1, target);
+      runningTotal += frameCounts[i];
+    }
+    // Correct any rounding drift on last phoneme
+    const allocated = scaledCounts.reduce((s, c) => s + c, 0);
+    scaledCounts[nPh - 1] = Math.max(1, scaledCounts[nPh - 1] + (nFrames - allocated));
+
+    // Expand: each phoneme's SSM output repeated/interpolated for its frame count
+    // Use smooth cosine interpolation between phoneme boundaries for naturalness
+    const expanded = new Float32Array(nFrames * D);
+    let framePtr = 0;
+    for (let pi = 0; pi < nPh; pi++) {
+      const cnt  = scaledCounts[pi];
+      const piN  = Math.min(pi + 1, nPh - 1); // next phoneme
+      for (let fi = 0; fi < cnt && framePtr < nFrames; fi++, framePtr++) {
+        // Cosine interpolation within phoneme segment
+        const t     = cnt > 1 ? fi / (cnt - 1) : 0;
+        const alpha = 0.5 - 0.5 * Math.cos(Math.PI * t); // smooth 0→1
+        for (let d = 0; d < D; d++) {
+          expanded[framePtr * D + d] =
+            seq[pi * D + d] * (1 - alpha) + seq[piN * D + d] * alpha;
+        }
+      }
+    }
+    // Safety fill if rounding left any frames
+    while (framePtr < nFrames) {
+      expanded.set(seq.subarray((nPh - 1) * D, nPh * D), framePtr * D);
+      framePtr++;
+    }
+
+    // Project to mel + acoustic coloring from voice vector
+    const mel = new Float32Array(nFrames * NM);
+    const [f0C, f0R, breath, fShift, fAg, tilt, mora, weight, reg, ageT] = voiceVec;
+
+    for (let f = 0; f < nFrames; f++) {
+      const frame = this.W_out.forward(expanded.subarray(f*D, (f+1)*D));
+      for (let m = 0; m < NM; m++) {
+        const mN = m / NM;
+        // Voice-conditioned spectral shaping
+        const f0Shape    = Math.exp(-0.5 * ((mN - (f0C * 0.6 + 0.1)) / 0.15) ** 2) * f0R * 0.35;
+        const breathShape = breath * 0.22 * (1 - mN * 0.6);
+        const f1 = 0.15 + fShift * 0.30, f2 = 0.35 + fShift * 0.20, f3 = 0.55 + fShift * 0.10;
+        const formantShape = (
+          Math.exp(-0.5 * ((mN - f1) / 0.09) ** 2) +
+          Math.exp(-0.5 * ((mN - f2) / 0.07) ** 2) * 0.7 +
+          Math.exp(-0.5 * ((mN - f3) / 0.06) ** 2) * 0.4
+        ) * fAg * 0.28;
+        const tiltShape   = (tilt - 0.5) * 0.32 * (mN - 0.5);
+        const weightShape = weight * 0.22 * Math.exp(-0.5 * ((mN - 0.35) / 0.18) ** 2);
+        const ageShape    = ageT * 0.08 * (mN * mN) * Math.sin(f * 0.3 + m * 0.7) * 0.3;
+        // Temporal modulation (quasi-prosodic)
+        const progress = f / Math.max(nFrames - 1, 1);
+        const prosody   = 1 + 0.15 * Math.sin(Math.PI * progress) * f0R;
+        mel[f*NM+m] = Math.tanh(
+          (frame[m] * 0.3 + f0Shape + breathShape + formantShape + tiltShape + weightShape + ageShape)
+          * prosody
+        );
+      }
+    }
+    return mel;
+  }
+
+  getLinearLayers() {
+    const layers = [this.W_out];
+    for (let l = 0; l < this.nLayers; l++)
+      layers.push(this.A_log[l], this.B[l], this.C[l], this.Wup[l], this.Wdown[l],
+                  this.adaln_shift[l], this.adaln_scale[l]);
+    return layers;
+  }
+}
+
+// ── G2P ───────────────────────────────────────────────────────────────────
+// Phoneme table — IPA symbols with synthesis metadata
+// duration in ms (approximate — learned duration model is future work)
+const PHONEMES = {
+  // Vowels
+  'a':  { type:'vowel',         dur:100, idx:1  },
+  'æ':  { type:'vowel',         dur:100, idx:2  },
+  'e':  { type:'vowel',         dur:95,  idx:3  },
+  'i':  { type:'vowel',         dur:90,  idx:4  },
+  'ɪ':  { type:'vowel',         dur:80,  idx:5  },
+  'o':  { type:'vowel',         dur:100, idx:6  },
+  'ɔ':  { type:'vowel',         dur:100, idx:7  },
+  'u':  { type:'vowel',         dur:90,  idx:8  },
+  'ʊ':  { type:'vowel',         dur:80,  idx:9  },
+  'ʌ':  { type:'vowel',         dur:90,  idx:10 },
+  'ə':  { type:'vowel',         dur:70,  idx:11 },
+  'ɛ':  { type:'vowel',         dur:90,  idx:12 },
+  'eɪ': { type:'diphthong',     dur:120, idx:13 },
+  'aɪ': { type:'diphthong',     dur:120, idx:14 },
+  'ɔɪ': { type:'diphthong',     dur:120, idx:15 },
+  'aʊ': { type:'diphthong',     dur:120, idx:16 },
+  'oʊ': { type:'diphthong',     dur:115, idx:17 },
+  // Nasals
+  'm':  { type:'nasal',         dur:85,  idx:18 },
+  'n':  { type:'nasal',         dur:85,  idx:19 },
+  'ŋ':  { type:'nasal',         dur:85,  idx:20 },
+  // Approximants
+  'w':  { type:'approximant',   dur:70,  idx:21 },
+  'j':  { type:'approximant',   dur:70,  idx:22 },
+  'l':  { type:'approximant',   dur:70,  idx:23 },
+  'r':  { type:'approximant',   dur:70,  idx:24 },
+  // Fricatives
+  's':  { type:'fricative',     dur:95,  idx:25 },
+  'z':  { type:'fricative',     dur:95,  idx:26 },
+  'ʃ':  { type:'fricative',     dur:100, idx:27 },
+  'ʒ':  { type:'fricative',     dur:100, idx:28 },
+  'f':  { type:'fricative',     dur:85,  idx:29 },
+  'v':  { type:'fricative',     dur:85,  idx:30 },
+  'θ':  { type:'fricative',     dur:85,  idx:31 },
+  'ð':  { type:'fricative',     dur:85,  idx:32 },
+  'h':  { type:'fricative',     dur:75,  idx:33 },
+  // Plosives
+  'p':  { type:'plosive',       dur:75,  idx:34 },
+  'b':  { type:'plosive',       dur:75,  idx:35 },
+  't':  { type:'plosive',       dur:75,  idx:36 },
+  'd':  { type:'plosive',       dur:75,  idx:37 },
+  'k':  { type:'plosive',       dur:75,  idx:38 },
+  'g':  { type:'plosive',       dur:75,  idx:39 },
+  'tʃ': { type:'affricate',     dur:100, idx:40 },
+  'dʒ': { type:'affricate',     dur:100, idx:41 },
+  // Silence / Pause
+  '_':  { type:'silence',       dur:80,  idx:0  },
+  ',':  { type:'pause_short',   dur:200, idx:0  },
+  '.':  { type:'pause_long',    dur:380, idx:0  },
+};
+
+const PH_IDX_MAP = Object.fromEntries(Object.entries(PHONEMES).map(([k,v]) => [k, v.idx]));
+
+// ConsciousNode names — these must be right
+const CN_NAMES = {
+  'omnivocal':    'a m n ɪ v o k ə l',
+  'consciousnode':'k a n ʃ ə s n o d',
+  'kham':         'k æ m',
+  'kehai':        'k e h aɪ',
+  'vael':         'v eɪ l',
+  'pixie':        'p ɪ k s i',
+  'labcoat':      'l æ b k o t',
+  'novel':        'n a v ɛ l',
+  'sextant':      's ɛ k s t ə n t',
+  'brymar':       'b r aɪ m ɑ r',
+  'aegis':        'i dʒ ɪ s',
+  'webster':      'w ɛ b s t ə r',
+  'localvocal':   'l o k ə l v o k ə l',
+  'chorus':       'k ɔ r ə s',
+  'htmlnlm':      'eɪ tʃ t i ɛ m ɛ l ɛ n ɛ l ɛ m',
+  'xinu':         'z aɪ n u',
+  'pop2':         'p a p t u',
+  'vallum':       'v æ l ə m',
+};
+
+// English pronunciation dictionary (ported and extended from Webster)
+const ENG_DICT = {
+  "the":"ð ə","of":"ʌ v","to":"t u","and":"æ n d","a":"ə","in":"ɪ n",
+  "is":"ɪ z","it":"ɪ t","you":"j u","that":"ð æ t","he":"h i",
+  "was":"w ʌ z","for":"f ɔ r","on":"a n","are":"a r","with":"w ɪ ð",
+  "as":"æ z","i":"aɪ","his":"h ɪ z","they":"ð eɪ","be":"b i",
+  "at":"æ t","one":"w ʌ n","have":"h æ v","this":"ð ɪ s","from":"f r ʌ m",
+  "or":"ɔ r","had":"h æ d","by":"b aɪ","but":"b ʌ t","what":"w ʌ t",
+  "some":"s ʌ m","we":"w i","can":"k æ n","out":"aʊ t","other":"ʌ ð ə r",
+  "were":"w ə r","all":"ɔ l","there":"ð ɛ r","when":"w ɛ n","up":"ʌ p",
+  "your":"j ɔ r","how":"h aʊ","said":"s ɛ d","an":"æ n","she":"ʃ i",
+  "do":"d u","their":"ð ɛ r","time":"t aɪ m","if":"ɪ f","will":"w ɪ l",
+  "about":"ə b aʊ t","then":"ð ɛ n","them":"ð ɛ m","would":"w ʊ d",
+  "like":"l aɪ k","so":"s oʊ","these":"ð i z","her":"h ə r","make":"m eɪ k",
+  "see":"s i","him":"h ɪ m","two":"t u","has":"h æ z","look":"l ʊ k",
+  "more":"m ɔ r","day":"d eɪ","could":"k ʊ d","go":"g oʊ","come":"k ʌ m",
+  "no":"n oʊ","people":"p i p ə l","my":"m aɪ","over":"oʊ v ə r",
+  "know":"n oʊ","than":"ð æ n","call":"k ɔ l","first":"f ə r s t",
+  "who":"h u","may":"m eɪ","down":"d aʊ n","been":"b ɪ n","now":"n aʊ",
+  "find":"f aɪ n d","any":"ɛ n i","new":"n u","work":"w ə r k",
+  "part":"p a r t","take":"t eɪ k","get":"g ɛ t","place":"p l eɪ s",
+  "live":"l ɪ v","where":"w ɛ r","after":"æ f t ə r","back":"b æ k",
+  "only":"oʊ n l i","man":"m æ n","year":"j i r","show":"ʃ oʊ",
+  "every":"ɛ v r i","good":"g ʊ d","me":"m i","give":"g ɪ v",
+  "our":"aʊ r","name":"n eɪ m","very":"v ɛ r i","through":"θ r u",
+  "just":"dʒ ʌ s t","great":"g r eɪ t","think":"θ ɪ ŋ k","say":"s eɪ",
+  "help":"h ɛ l p","most":"m oʊ s t","also":"ɔ l s oʊ","play":"p l eɪ",
+  "small":"s m ɔ l","end":"ɛ n d","home":"h oʊ m","hand":"h æ n d",
+  "large":"l a r dʒ","even":"i v ə n","here":"h i r","must":"m ʌ s t",
+  "big":"b ɪ g","high":"h aɪ","such":"s ʌ tʃ","why":"w aɪ","ask":"æ s k",
+  "men":"m ɛ n","went":"w ɛ n t","light":"l aɪ t","kind":"k aɪ n d",
+  "off":"ɔ f","need":"n i d","house":"h aʊ s","try":"t r aɪ","us":"ʌ s",
+  "again":"ə g ɛ n","point":"p ɔɪ n t","world":"w ə r l d","near":"n i r",
+  "self":"s ɛ l f","earth":"ə r θ","head":"h ɛ d","stand":"s t æ n d",
+  "own":"oʊ n","should":"ʃ ʊ d","country":"k ʌ n t r i","found":"f aʊ n d",
+  "school":"s k u l","grow":"g r oʊ","still":"s t ɪ l","learn":"l ə r n",
+  "food":"f u d","four":"f ɔ r","between":"b ɪ t w i n","keep":"k i p",
+  "never":"n ɛ v ə r","last":"l æ s t","let":"l ɛ t","city":"s ɪ t i",
+  "tree":"t r i","hard":"h a r d","start":"s t a r t","story":"s t ɔ r i",
+  "far":"f a r","sea":"s i","left":"l ɛ f t","late":"l eɪ t","run":"r ʌ n",
+  "night":"n aɪ t","real":"r i ə l","life":"l aɪ f","few":"f j u",
+  "open":"oʊ p ə n","next":"n ɛ k s t","white":"w aɪ t","got":"g a t",
+  "walk":"w ɔ k","always":"ɔ l w eɪ z","music":"m j u z ɪ k","both":"b oʊ θ",
+  "often":"ɔ f ə n","letter":"l ɛ t ə r","until":"ʌ n t ɪ l","mile":"m aɪ l",
+  "river":"r ɪ v ə r","car":"k a r","care":"k ɛ r","book":"b ʊ k",
+  "science":"s aɪ ə n s","eat":"i t","room":"r u m","friend":"f r ɛ n d",
+  "idea":"aɪ d i ə","mountain":"m aʊ n t ə n","stop":"s t a p","hear":"h i r",
+  "horse":"h ɔ r s","cut":"k ʌ t","watch":"w a tʃ","color":"k ʌ l ə r",
+  "face":"f eɪ s","main":"m eɪ n","enough":"ɪ n ʌ f","girl":"g ə r l",
+  "young":"j ʌ ŋ","ready":"r ɛ d i","above":"ə b ʌ v","feel":"f i l",
+  "talk":"t ɔ k","bird":"b ə r d","soon":"s u n","family":"f æ m l i",
+  "door":"d ɔ r","short":"ʃ ɔ r t","wind":"w ɪ n d","happen":"h æ p ə n",
+  "complete":"k ə m p l i t","ship":"ʃ ɪ p","half":"h æ f","rock":"r a k",
+  "fire":"f aɪ r","south":"s aʊ θ","piece":"p i s","knew":"n u",
+  "since":"s ɪ n s","top":"t a p","whole":"h oʊ l","space":"s p eɪ s",
+  "best":"b ɛ s t","hour":"aʊ ə r","better":"b ɛ t ə r","true":"t r u",
+  "hundred":"h ʌ n d r ə d","five":"f aɪ v","remember":"r ɪ m ɛ m b ə r",
+  "early":"ə r l i","hold":"h oʊ l d","ground":"g r aʊ n d","fast":"f æ s t",
+  "sing":"s ɪ ŋ","listen":"l ɪ s ə n","six":"s ɪ k s","table":"t eɪ b ə l",
+  "morning":"m ɔ r n ɪ ŋ","ten":"t ɛ n","simple":"s ɪ m p ə l","love":"l ʌ v",
+  "person":"p ə r s ə n","money":"m ʌ n i","road":"r oʊ d","rain":"r eɪ n",
+  "rule":"r u l","cold":"k oʊ l d","notice":"n oʊ t ɪ s","voice":"v ɔɪ s",
+  "power":"p aʊ ə r","town":"t aʊ n","fine":"f aɪ n","fly":"f l aɪ",
+  "fall":"f ɔ l","lead":"l i d","dark":"d a r k","note":"n oʊ t",
+  "wait":"w eɪ t","plan":"p l æ n","star":"s t a r","noun":"n aʊ n",
+  "done":"d ʌ n","drive":"d r aɪ v","front":"f r ʌ n t","teach":"t i tʃ",
+  "week":"w i k","final":"f aɪ n ə l","green":"g r i n","oh":"oʊ",
+  "quick":"k w ɪ k","ocean":"oʊ ʃ ə n","warm":"w ɔ r m","free":"f r i",
+  "strong":"s t r ɔ ŋ","mind":"m aɪ n d","clear":"k l i r","fact":"f æ k t",
+  "street":"s t r i t","nothing":"n ʌ θ ɪ ŋ","stay":"s t eɪ","full":"f ʊ l",
+  "force":"f ɔ r s","blue":"b l u","deep":"d i p","moon":"m u n",
+  "island":"aɪ l ə n d","foot":"f ʊ t","system":"s ɪ s t ə m","test":"t ɛ s t",
+  "boat":"b oʊ t","gold":"g oʊ l d","plane":"p l eɪ n","dry":"d r aɪ",
+  "wonder":"w ʌ n d ə r","laugh":"l æ f","thousand":"θ aʊ z ə n d","ago":"ə g oʊ",
+  "ran":"r æ n","game":"g eɪ m","shape":"ʃ eɪ p","heat":"h i t",
+  "snow":"s n oʊ","bring":"b r ɪ ŋ","yes":"j ɛ s","fill":"f ɪ l",
+  "east":"i s t","language":"l æ ŋ g w ɪ dʒ","ball":"b ɔ l","wave":"w eɪ v",
+  "heart":"h a r t","am":"æ m","heavy":"h ɛ v i","arm":"a r m",
+  "wide":"w aɪ d","size":"s aɪ z","speak":"s p i k","weight":"w eɪ t",
+  "matter":"m æ t ə r","circle":"s ə r k ə l","include":"ɪ n k l u d",
+  "length":"l ɛ ŋ θ","art":"a r t","energy":"ɛ n ə r dʒ i",
+  "bed":"b ɛ d","brother":"b r ʌ ð ə r","egg":"ɛ g","ride":"r aɪ d",
+  "believe":"b ɪ l i v","forest":"f ɔ r ɪ s t","sit":"s ɪ t","race":"r eɪ s",
+  "window":"w ɪ n d oʊ","store":"s t ɔ r","summer":"s ʌ m ə r",
+  "train":"t r eɪ n","sleep":"s l i p","leg":"l ɛ g","wall":"w ɔ l",
+  "catch":"k æ tʃ","wish":"w ɪ ʃ","sky":"s k aɪ","joy":"dʒ ɔɪ",
+  "winter":"w ɪ n t ə r","wild":"w aɪ l d","glass":"g l æ s",
+  "grass":"g r æ s","job":"dʒ a b","edge":"ɛ dʒ","sign":"s aɪ n",
+  "visit":"v ɪ z ɪ t","past":"p æ s t","fun":"f ʌ n","bright":"b r aɪ t",
+  "month":"m ʌ n θ","bear":"b ɛ r","finish":"f ɪ n ɪ ʃ","happy":"h æ p i",
+  "hope":"h oʊ p","flower":"f l aʊ ə r","jump":"dʒ ʌ m p","baby":"b eɪ b i",
+  "eight":"eɪ t","meet":"m i t","root":"r u t","buy":"b aɪ","raise":"r eɪ z",
+  "seven":"s ɛ v ə n","third":"θ ə r d","shall":"ʃ æ l","held":"h ɛ l d",
+  "hair":"h ɛ r","cook":"k ʊ k","floor":"f l ɔ r","hill":"h ɪ l",
+  "safe":"s eɪ f","cat":"k æ t","type":"t aɪ p","law":"l ɔ","bit":"b ɪ t",
+  "copy":"k a p i","phrase":"f r eɪ z","tall":"t ɔ l","sand":"s æ n d",
+  "roll":"r oʊ l","finger":"f ɪ ŋ g ə r","fight":"f aɪ t","lie":"l aɪ",
+  "beat":"b i t","view":"v j u","sense":"s ɛ n s","ear":"i r","quite":"k w aɪ t",
+  "case":"k eɪ s","kill":"k ɪ l","son":"s ʌ n","lake":"l eɪ k",
+  "loud":"l aʊ d","spring":"s p r ɪ ŋ","child":"tʃ aɪ l d","speed":"s p i d",
+  "pay":"p eɪ","age":"eɪ dʒ","dress":"d r ɛ s","cloud":"k l aʊ d",
+  "stone":"s t oʊ n","tiny":"t aɪ n i","climb":"k l aɪ m","cool":"k u l",
+  "design":"d ɪ z aɪ n","lot":"l a t","bottom":"b a t ə m","key":"k i",
+  "iron":"aɪ ə r n","stick":"s t ɪ k","flat":"f l æ t","skin":"s k ɪ n",
+  "smile":"s m aɪ l","hole":"h oʊ l","trip":"t r ɪ p","row":"r oʊ",
+  "mouth":"m aʊ θ","die":"d aɪ","least":"l i s t","seed":"s i d",
+  "tone":"t oʊ n","join":"dʒ ɔɪ n","clean":"k l i n","break":"b r eɪ k",
+  "yard":"j a r d","rise":"r aɪ z","bad":"b æ d","blow":"b l oʊ",
+  "oil":"ɔɪ l","blood":"b l ʌ d","touch":"t ʌ tʃ","mix":"m ɪ k s",
+  "team":"t i m","cost":"k ɔ s t","lost":"l ɔ s t","brown":"b r aʊ n",
+  "garden":"g a r d ə n","equal":"i k w ə l","sent":"s ɛ n t",
+  "choose":"tʃ u z","fell":"f ɛ l","fit":"f ɪ t","flow":"f l oʊ",
+  "bank":"b æ ŋ k","save":"s eɪ v","control":"k ə n t r oʊ l",
+  "gentle":"dʒ ɛ n t ə l","woman":"w ʊ m ə n","captain":"k æ p t ə n",
+  // Tech / ConsciousNode vocab
+  "hello":"h ɛ l oʊ","speech":"s p i tʃ","synthesizer":"s ɪ n θ ɛ s aɪ z ə r",
+  "browser":"b r aʊ z ə r","using":"j u z ɪ ŋ","used":"j u z d",
+  "web":"w ɛ b","audio":"ɔ d i oʊ","api":"eɪ p i aɪ","model":"m a d ə l",
+  "human":"h j u m ə n","vocal":"v oʊ k ə l","tract":"t r æ k t",
+  "generate":"dʒ ɛ n ə r eɪ t","synthesis":"s ɪ n θ ɛ s ɪ s",
+  "phoneme":"f oʊ n i m","phonemes":"f oʊ n i m z",
+  "frequency":"f r i k w ə n s i","filter":"f ɪ l t ə r",
+  "signal":"s ɪ g n ə l","digital":"d ɪ dʒ ɪ t ə l",
+  "output":"aʊ t p ʊ t","input":"ɪ n p ʊ t","buffer":"b ʌ f ə r",
+  "sample":"s æ m p ə l","rate":"r eɪ t","gain":"g eɪ n",
+  "node":"n oʊ d","nodes":"n oʊ d z","offline":"ɔ f l aɪ n",
+  "waveform":"w eɪ v f ɔ r m","zero":"z ɪ r oʊ","neural":"n ʊ r ə l",
+  "network":"n ɛ t w ə r k","browser":"b r aʊ z ə r","native":"n eɪ t ɪ v",
+  "entirely":"ɪ n t aɪ ə r l i","running":"r ʌ n ɪ ŋ","built":"b ɪ l t",
+  "system":"s ɪ s t ə m","identity":"aɪ d ɛ n t ɪ t i",
+  "training":"t r eɪ n ɪ ŋ","trained":"t r eɪ n d","model":"m a d ə l",
+  "voice":"v ɔɪ s","voices":"v ɔɪ s ɪ z","portable":"p ɔ r t ə b ə l",
+  "spectrogram":"s p ɛ k t r ə g r æ m","mel":"m ɛ l","band":"b æ n d",
+  "ternary":"t ə r n ə r i","layer":"l eɪ ə r","layers":"l eɪ ə r z",
+  "acoustic":"ə k u s t ɪ k","formant":"f ɔ r m ə n t",
+  "vocoder":"v oʊ k oʊ d ə r","conditioning":"k ə n d ɪ ʃ ə n ɪ ŋ",
+  "architecture":"a r k ɪ t ɛ k tʃ ə r","implementation":"ɪ m p l ə m ɛ n t eɪ ʃ ə n",
+  "browser":"b r aʊ z ə r","dependency":"d ɪ p ɛ n d ə n s i",
+  "file":"f aɪ l","single":"s ɪ ŋ g ə l","hardware":"h a r d w ɛ r",
+  // Numbers
+  "zero":"z ɪ r oʊ","one":"w ʌ n","two":"t u","three":"θ r i",
+  "four":"f ɔ r","five":"f aɪ v","six":"s ɪ k s","seven":"s ɛ v ə n",
+  "eight":"eɪ t","nine":"n aɪ n","ten":"t ɛ n",
+};
+
+// Letter-to-phoneme rule fallback
+function englishG2P_fallback(word) {
+  const w = word.toLowerCase();
+  // Check CN names first
+  if (CN_NAMES[w]) return CN_NAMES[w].split(' ');
+  if (ENG_DICT[w]) return ENG_DICT[w].split(' ');
+
+  // Rule-based fallback
+  let ph = [], i = 0;
+  const RULES = [
+    ['tch',['tʃ']],['sch',['ʃ']],['dge',['dʒ']],['igh',['aɪ']],
+    ['tion',['ʃ','ə','n']],['sion',['ʒ','ə','n']],['ous',['ə','s']],
+    ['ck',['k']],['ch',['tʃ']],['sh',['ʃ']],['th',['θ']],['ph',['f']],
+    ['wh',['w']],['ng',['ŋ']],['nk',['ŋ','k']],['qu',['k','w']],
+    ['oo',['u']],['ee',['i']],['ea',['i']],['ai',['eɪ']],['ay',['eɪ']],
+    ['oa',['oʊ']],['ou',['aʊ']],['ow',['oʊ']],['oi',['ɔɪ']],['oy',['ɔɪ']],
+    ['ew',['u']],['ue',['u']],['ie',['i']],['ei',['i']],['au',['ɔ']],
+    ['aw',['ɔ']],['igh',['aɪ']],
+    ['a',['æ']],['e',['ɛ']],['i',['ɪ']],['o',['ɔ']],['u',['ʌ']],['y',['ɪ']],
+    ['b',['b']],['c',['k']],['d',['d']],['f',['f']],['g',['g']],
+    ['h',['h']],['j',['dʒ']],['k',['k']],['l',['l']],['m',['m']],
+    ['n',['n']],['p',['p']],['r',['r']],['s',['s']],['t',['t']],
+    ['v',['v']],['w',['w']],['x',['k','s']],['z',['z']],
+  ];
+  while (i < w.length) {
+    let matched = false;
+    for (const [pat, phs] of RULES) {
+      if (w.startsWith(pat, i)) { ph.push(...phs); i += pat.length; matched = true; break; }
+    }
+    if (!matched) i++;
+  }
+  return ph.filter(p => PHONEMES[p]);
+}
+
+// Full G2P pipeline (English default)
+const G2P = {
+  en(text) {
+    const VOWEL_INITIALS = new Set(['a','e','i','o','u','æ','ɛ','ɪ','ɔ','ʌ','ə','aɪ','eɪ','oʊ','aʊ','ɔɪ']);
+    const words = text.toLowerCase().match(/[\w']+|[.,!?;:]/g) || [];
+    const phonemes = [];
+
+    words.forEach((w, wi) => {
+      if (/^[.,!?;:]$/.test(w)) {
+        phonemes.push(/^[,;:]$/.test(w) ? ',' : '.'); return;
+      }
+
+      // CN names
+      if (CN_NAMES[w]) {
+        phonemes.push(...CN_NAMES[w].split(' ').filter(p => PHONEMES[p]), '_'); return;
+      }
+
+      // The/a allomorphs
+      if (w === 'the' || w === 'a') {
+        let nextVowel = false;
+        for (let ni = wi + 1; ni < words.length; ni++) {
+          if (!/^[.,!?;:]$/.test(words[ni])) {
+            const nph = ENG_DICT[words[ni]] ? ENG_DICT[words[ni]].split(' ') : englishG2P_fallback(words[ni]);
+            nextVowel = VOWEL_INITIALS.has(nph[0]);
+            break;
+          }
+        }
+        if (w === 'the') phonemes.push(nextVowel ? 'ð' : 'ð', nextVowel ? 'i' : 'ə', '_');
+        else phonemes.push(nextVowel ? 'eɪ' : 'ə', '_');
+        return;
+      }
+
+      const phs = englishG2P_fallback(w);
+      phonemes.push(...phs, '_');
+    });
+
+    return phonemes;
+  },
+
+  ja(text) {
+    const kana = {
+      'あ':'a','い':'i','う':'u','え':'e','お':'o',
+      'か':'k a','き':'k i','く':'k u','け':'k e','こ':'k o',
+      'さ':'s a','し':'ʃ i','す':'s u','せ':'s e','そ':'s o',
+      'た':'t a','ち':'tʃ i','つ':'t s u','て':'t e','と':'t o',
+      'な':'n a','に':'n i','ぬ':'n u','ね':'n e','の':'n o',
+      'は':'h a','ひ':'h i','ふ':'f u','へ':'h e','ほ':'h o',
+      'ま':'m a','み':'m i','む':'m u','め':'m e','も':'m o',
+      'や':'j a','ゆ':'j u','よ':'j o',
+      'ら':'r a','り':'r i','る':'r u','れ':'r e','ろ':'r o',
+      'わ':'w a','を':'o','ん':'n',
+      'が':'g a','ぎ':'g i','ぐ':'g u','げ':'g e','ご':'g o',
+      'ざ':'z a','じ':'ʒ i','ず':'z u','ぜ':'z e','ぞ':'z o',
+      'だ':'d a','で':'d e','ど':'d o',
+      'ば':'b a','び':'b i','ぶ':'b u','べ':'b e','ぼ':'b o',
+      'ぱ':'p a','ぴ':'p i','ぷ':'p u','ぺ':'p e','ぽ':'p o',
+      'きゃ':'k j a','きゅ':'k j u','きょ':'k j o',
+      'しゃ':'ʃ a','しゅ':'ʃ u','しょ':'ʃ o',
+      'ちゃ':'tʃ a','ちゅ':'tʃ u','ちょ':'tʃ o',
+    };
+    const toHira = c => {
+      const code = c.charCodeAt(0);
+      return (code >= 0x30A1 && code <= 0x30F6) ? String.fromCharCode(code - 0x60) : c;
+    };
+    const ph = [];
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i], hC = toHira(c), hN = toHira(text[i+1]||'');
+      if (/[.,!?。、]/.test(c)) { ph.push(c==='、'||c===','?',':'.'); continue; }
+      if (c===' ') { ph.push('_'); continue; }
+      if (hC==='っ') { if(kana[hN]) ph.push(kana[hN].split(' ')[0]); else ph.push('_'); continue; }
+      if (hN && kana[hC+hN]) { ph.push(...kana[hC+hN].split(' ')); i++; }
+      else if (kana[hC]) ph.push(...kana[hC].split(' '));
+    }
+    return ph.filter(p => PHONEMES[p]||p===','||p==='.');
+  },
+
+  es(text) {
+    const ph = [];
+    const t = text.toLowerCase();
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i], n = t[i+1]||'';
+      if (/[.,!?]/.test(c)) { ph.push(c===','?',':'.'); continue; }
+      if (c===' ') { ph.push('_'); continue; }
+      if (c==='l'&&n==='l'){ph.push('j');i++;} else if(c==='r'&&n==='r'){ph.push('r','r');i++;}
+      else if(c==='c'&&(n==='e'||n==='i')){ph.push('s');}
+      else if(c==='c'&&n==='h'){ph.push('t','ʃ');i++;}
+      else if(c==='c'){ph.push('k');}
+      else if(c==='q'&&n==='u'){ph.push('k');i++;}
+      else if(c==='g'&&(n==='e'||n==='i')){ph.push('h');}
+      else if(c==='g'){ph.push('g');}
+      else if(c==='h'){/* silent */}
+      else if(c==='v'){ph.push('b');}
+      else if(c==='ñ'){ph.push('n','j');}
+      else if(c==='y'){ph.push('j');}
+      else if(c==='j'){ph.push('h');}
+      else if(c==='z'){ph.push('s');}
+      else if(PHONEMES[c]){ph.push(c);}
+    }
+    return ph.filter(p=>PHONEMES[p]||p===','||p==='.');
+  },
+
+  de(text) {
+    let t = text.toLowerCase()
+      .replace(/sch/g,'ʃ').replace(/ch/g,'x')
+      .replace(/eu|äu/g,'ɔɪ').replace(/ei/g,'aɪ')
+      .replace(/ie/g,'i').replace(/au/g,'aʊ')
+      .replace(/z/g,'t s').replace(/w/g,'v').replace(/v/g,'f')
+      .replace(/ß/g,'s').replace(/ä/g,'ɛ').replace(/ö/g,'ø').replace(/ü/g,'y');
+    const ph=[];
+    for(let i=0;i<t.length;i++){
+      const c=t[i];
+      if(/[.,!?]/.test(c)){ph.push(c===','?',':'.');} else if(c===' '){ph.push('_');}
+      else if(PHONEMES[c]){ph.push(c);}
+    }
+    return ph.filter(p=>PHONEMES[p]||p===','||p==='.');
+  },
+
+  fr(text) {
+    let t = text.toLowerCase()
+      .replace(/eau/g,'o').replace(/au/g,'o').replace(/ou/g,'u').replace(/eu/g,'ø')
+      .replace(/ch/g,'ʃ').replace(/gn/g,'n j').replace(/qu/g,'k')
+      .replace(/c(?=[eiy])/g,'s').replace(/c/g,'k')
+      .replace(/j/g,'ʒ').replace(/é|è|ê/g,'e').replace(/h/g,'');
+    const ph=[];
+    for(let i=0;i<t.length;i++){
+      const c=t[i];
+      if('stdpxz'.includes(c)&&(!t[i+1]||t[i+1]===' ')) continue;
+      if(/[.,!?]/.test(c)){ph.push(c===','?',':'.');} else if(c===' '){ph.push('_');}
+      else if(PHONEMES[c]){ph.push(c);}
+    }
+    return ph.filter(p=>PHONEMES[p]||p===','||p==='.');
+  },
+
+  ru(text) {
+    const map={
+      'а':'a','б':'b','в':'v','г':'g','д':'d','е':'j e','ё':'j o','ж':'ʒ','з':'z',
+      'и':'i','й':'j','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r',
+      'с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'t s','ч':'tʃ','ш':'ʃ','щ':'ʃ',
+      'ъ':'','ы':'ɪ','ь':'','э':'ɛ','ю':'j u','я':'j a',
+    };
+    const ph=[];
+    for(const c of text.toLowerCase()){
+      if(/[.,!?]/.test(c)){ph.push(c===','?',':'.');} else if(c===' '){ph.push('_');}
+      else if(map[c]) ph.push(...map[c].split(' ').filter(Boolean));
+    }
+    return ph.filter(p=>PHONEMES[p]||p===','||p==='.');
+  },
+
+  ko(text) {
+    const cho=['k','k','n','t','t','r','m','p','p','s','s','','tʃ','tʃ','k','t','p','h'];
+    const jung=['a','e','j a','j e','ɛ','e','j ɛ','j e','o','w a','w e','ø','j o','u','w ɛ','w e','y','j u','ɪ','i','i'];
+    const jong=['','k','k','k','n','n','n','t','l','l','l','l','l','l','l','m','p','p','t','t','ŋ','t','t','k','t','p','h'];
+    const ph=[];
+    for(const c of text){
+      const code=c.charCodeAt(0);
+      if(/[.,!?]/.test(c)){ph.push(c===','?',':'.'); continue;}
+      if(c===' '){ph.push('_'); continue;}
+      if(code>=0xAC00&&code<=0xD7A3){
+        const off=code-0xAC00;
+        const cI=Math.floor(off/588),jI=Math.floor((off%588)/28),joI=off%28;
+        if(cho[cI]) ph.push(...cho[cI].split(' ').filter(Boolean));
+        if(jung[jI]) ph.push(...jung[jI].split(' ').filter(Boolean));
+        if(jong[joI]) ph.push(...jong[joI].split(' ').filter(Boolean));
+      }
+    }
+    return ph.filter(p=>PHONEMES[p]||p===','||p==='.');
+  },
+};
+
+// ── DESCRIBE VOICE ────────────────────────────────────────────────────────
+function describeVoice(params) {
+  const [f0C,f0R,breath,fShift,fAg,tilt,mora,weight,reg,ageT] = params;
+  const pitch   = f0C<0.25?'deep bass':f0C<0.40?'bass':f0C<0.50?'baritone':f0C<0.58?'tenor':f0C<0.65?'alto':f0C<0.75?'mezzo-soprano':'soprano';
+  const expr    = f0R<0.15?'monotone':f0R<0.35?'contained':f0R<0.55?'measured':f0R<0.75?'expressive':'dramatic';
+  const bDesc   = breath<0.15?'':breath<0.30?'slightly breathy':breath<0.55?'airy':breath<0.75?'breathy':'very breathy';
+  const resDesc = fShift<0.25?'dark resonance':fShift<0.42?'warm resonance':fShift<0.58?'':fShift<0.75?'forward resonance':'bright resonance';
+  const agDesc  = fAg<0.25?'slow articulation':fAg<0.45?'':fAg<0.70?'clear articulation':'crisp articulation';
+  const tDesc   = tilt<0.30?'dark timbre':tilt<0.55?'':tilt<0.75?'bright timbre':'very bright timbre';
+  const wDesc   = weight<0.25?'very light':weight<0.42?'light':weight<0.58?'medium':weight<0.75?'full':'heavy';
+  const rDesc   = reg<0.30?'head voice':reg<0.50?'mixed-head':reg<0.65?'mixed-chest':'chest voice';
+  const texDesc = ageT<0.15?'very smooth':ageT<0.35?'smooth':ageT<0.55?'light texture':ageT<0.75?'textured':'rough';
+  return [`${expr} ${pitch}`,bDesc,resDesc,agDesc,tDesc,`${wDesc} ${rDesc}`,texDesc].filter(Boolean).join(', ');
+}
+
+// ── VOICE AXES DEFINITION ─────────────────────────────────────────────────
+const AXES = [
+  { id:'f0_range',   label:'F0 RANGE',    default:0.45 },
+  { id:'breathiness',label:'BREATHINESS', default:0.20 },
+  { id:'f_shift',    label:'FORMANT SHIFT',default:0.50 },
+  { id:'f_agility',  label:'F AGILITY',   default:0.55 },
+  { id:'spec_tilt',  label:'SPEC TILT',   default:0.45 },
+  { id:'mora',       label:'MORA TIMING', default:0.40 },
+  { id:'weight',     label:'VOC WEIGHT',  default:0.50 },
+  { id:'register',   label:'REGISTER',    default:0.60 },
+  { id:'age_tex',    label:'AGE TEXTURE', default:0.25 },
+  { id:'f0_center',  label:'F0 CENTER',   default:0.45 },
+];
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let trainingSession = 0;
+const STATE = {
+  trainSession:      0,
+  mvc:               null,   // MVCModel instance
+  vocoder:           null,   // NeuralVocoder instance
+  durModel:          null,   // DurationModel instance
+  useNeuralVocoder:  true,
+  voiceVec:          null,   // Float32Array[10]
+  lastMel:           null,
+  lastPCM:           null,
+  audioCtx:          null,
+  playing:           false,
+  synSession:        0,
+};
+
+// ── AUDIO ─────────────────────────────────────────────────────────────────
+function getAudioCtx() {
+  if (!STATE.audioCtx) STATE.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (STATE.audioCtx.state === 'suspended') STATE.audioCtx.resume();
+  return STATE.audioCtx;
+}
+
+async function playPCM(pcm, sr) {
+  const ctx = getAudioCtx();
+  const buf = ctx.createBuffer(1, pcm.length, sr);
+  buf.getChannelData(0).set(pcm);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  src.start();
+  return new Promise(res => { src.onended = res; });
+}
+
+function encodeWAV(pcm, sr) {
+  const nCh = 1, bitsPerSample = 16, byteRate = sr * nCh * bitsPerSample / 8;
+  const dataBytes = pcm.length * 2, totalBytes = 44 + dataBytes;
+  const buf = new ArrayBuffer(totalBytes);
+  const view = new DataView(buf);
+  let p = 0;
+  const u32 = v => { view.setUint32(p, v, true); p += 4; };
+  const u16 = v => { view.setUint16(p, v, true); p += 2; };
+  // RIFF header
+  view.setUint8(p++,82);view.setUint8(p++,73);view.setUint8(p++,70);view.setUint8(p++,70); // RIFF
+  u32(totalBytes - 8);
+  view.setUint8(p++,87);view.setUint8(p++,65);view.setUint8(p++,86);view.setUint8(p++,69); // WAVE
+  view.setUint8(p++,102);view.setUint8(p++,109);view.setUint8(p++,116);view.setUint8(p++,32); // fmt
+  u32(16); u16(1); u16(nCh); u32(sr); u32(byteRate); u16(nCh*bitsPerSample/8); u16(bitsPerSample);
+  view.setUint8(p++,100);view.setUint8(p++,97);view.setUint8(p++,116);view.setUint8(p++,97); // data
+  u32(dataBytes);
+  for (let i = 0; i < pcm.length; i++) {
+    const s = Math.max(-1, Math.min(1, pcm[i]));
+    view.setInt16(p, s < 0 ? s * 32768 : s * 32767, true); p += 2;
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+// ── MEL CANVAS RENDERER ───────────────────────────────────────────────────
+function drawMelCanvas(mel, nFrames, nMels) {
+  const canvas = document.getElementById('mel-canvas');
+  const rect   = canvas.getBoundingClientRect();
+  canvas.width  = Math.floor(rect.width) || 800;
+  canvas.height = Math.floor(rect.height) || 200;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  if (!mel || nFrames === 0) return;
+
+  // Find mel range
+  let minV = Infinity, maxV = -Infinity;
+  for (let i = 0; i < mel.length; i++) {
+    if (mel[i] < minV) minV = mel[i];
+    if (mel[i] > maxV) maxV = mel[i];
+  }
+  const range = maxV - minV || 1;
+
+  // Color palette: deep blue → cyan → white (mel energy)
+  const palette = [
+    [0,   0x00, 0x0a, 0x1f],
+    [0.2, 0x00, 0x3a, 0x7a],
+    [0.4, 0x00, 0x66, 0xcc],
+    [0.6, 0x00, 0xaa, 0xff],
+    [0.8, 0x66, 0xdd, 0xff],
+    [1.0, 0xff, 0xff, 0xff],
+  ];
+  function melColor(v) {
+    const t = Math.max(0, Math.min(1, (v - minV) / range));
+    for (let i = 1; i < palette.length; i++) {
+      if (t <= palette[i][0]) {
+        const a = palette[i-1], b = palette[i];
+        const f = (t - a[0]) / (b[0] - a[0]);
+        return [
+          Math.round(a[1] + (b[1]-a[1])*f),
+          Math.round(a[2] + (b[2]-a[2])*f),
+          Math.round(a[3] + (b[3]-a[3])*f),
+        ];
+      }
+    }
+    return [255,255,255];
+  }
+
+  const imgData = ctx.createImageData(W, H);
+  const data    = imgData.data;
+
+  for (let px = 0; px < W; px++) {
+    const f = Math.floor(px * nFrames / W);
+    for (let py = 0; py < H; py++) {
+      // mel bands: low freq at bottom, high at top
+      const m = Math.floor((1 - py / H) * nMels);
+      const v = mel[f * nMels + Math.min(m, nMels-1)];
+      const [r,g,b] = melColor(v);
+      const idx = (py * W + px) * 4;
+      data[idx]   = r;
+      data[idx+1] = g;
+      data[idx+2] = b;
+      data[idx+3] = 255;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  // Frequency axis labels
+  ctx.fillStyle = 'rgba(0,212,255,0.7)';
+  ctx.font = '9px Space Mono, monospace';
+  const freqLabels = [[0,'0'],[0.25,'3k'],[0.5,'6k'],[0.75,'9k'],[1,'12k']];
+  freqLabels.forEach(([pos,lbl]) => {
+    const y = H - pos * H;
+    ctx.fillText(lbl, 2, Math.max(10, y - 2));
+  });
+}
+
+function drawWaveCanvas(pcm) {
+  const canvas = document.getElementById('wave-canvas');
+  const rect   = canvas.getBoundingClientRect();
+  canvas.width  = Math.floor(rect.width) || 800;
+  canvas.height = 60;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  ctx.fillStyle = '#080a0e';
+  ctx.fillRect(0, 0, W, H);
+  if (!pcm || pcm.length === 0) return;
+
+  // Normalize
+  let maxAbs = 1e-9;
+  for (let i = 0; i < pcm.length; i++) maxAbs = Math.max(maxAbs, Math.abs(pcm[i]));
+  const scale = 0.9 / maxAbs;
+
+  ctx.strokeStyle = 'var(--accent, #00d4ff)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+
+  const step = Math.max(1, Math.floor(pcm.length / W));
+  for (let px = 0; px < W; px++) {
+    const si = Math.floor(px * pcm.length / W);
+    let maxV = 0;
+    for (let j = 0; j < step; j++) maxV = Math.max(maxV, Math.abs(pcm[si + j] || 0));
+    const y = H/2 - maxV * scale * H/2;
+    if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+  }
+  ctx.stroke();
+
+  // Center line
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, H/2); ctx.lineTo(W, H/2);
+  ctx.stroke();
+}
+
+// ── PHONEME STRIP RENDERER ────────────────────────────────────────────────
+function renderPhonemeStrip(phonemes) {
+  const strip = document.getElementById('phoneme-strip');
+  strip.innerHTML = '';
+  const count = document.getElementById('phoneme-count');
+  count.textContent = `${phonemes.length} phonemes`;
+
+  phonemes.forEach(ph => {
+    const chip = document.createElement('span');
+    chip.className = 'ph-chip';
+    if (ph === '_') {
+      chip.className += ' silence';
+      chip.textContent = '·';
+    } else if (ph === ',' || ph === '.') {
+      chip.className += ' pause';
+      chip.textContent = ph === ',' ? '‥' : '…';
+    } else {
+      chip.textContent = ph;
+    }
+    strip.appendChild(chip);
+  });
+}
+
+// ── SYNTHESIS CORE ────────────────────────────────────────────────────────
+function yieldToMain() {
+  return new Promise(res => setTimeout(res, 0));
+}
+
+// Mobile detection — Android Chrome needs aggressive yielding + frame cap
+const IS_MOBILE = /Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
+const MOBILE_FRAME_CAP = 180;  // ~1.9s audio max on mobile
+const YIELD_EVERY = IS_MOBILE ? 6 : 32;
+
+// Async chunked MVC forward — yields every YIELD_EVERY frames to keep mobile alive
+async function mvcForwardAsync(phIdxs, nFrames, voiceVec, sessionToken, useSynSession = true) {
+  if (!IS_MOBILE) {
+    // Desktop: run synchronously, single yield after
+    const mel = STATE.mvc.forward(phIdxs, nFrames, voiceVec);
+    await yieldToMain();
+    return mel;
+  }
+
+  // Mobile: chunked async forward — we re-implement the hot path here
+  // so we can yield between frame chunks without blocking Chrome
+  const mvc = STATE.mvc;
+  const D   = mvc.dModel;
+  const NM  = CFG.n_mels;
+  const nPh = phIdxs.length;
+
+  // ── Step 1: Build sinusoidal phoneme embeddings (fast, no yield needed)
+  let seq = new Float32Array(nPh * D);
+  for (let i = 0; i < nPh; i++) {
+    const pid = phIdxs[i];
+    for (let d = 0; d < D; d++) {
+      seq[i*D+d] = (d % 2 === 0)
+        ? Math.sin(pid * 0.3 * (d/2 + 1) * 0.07) * 0.2
+        : Math.cos(pid * 0.3 * (Math.floor(d/2) + 1) * 0.07) * 0.2;
+    }
+  }
+
+  // ── Step 2: SSM layers — yield between layers
+  for (let layer = 0; layer < mvc.nLayers; layer++) {
+    LOG.dim(`MVC layer ${layer+1}/${mvc.nLayers}...`);
+    await yieldToMain();
+    if (useSynSession ? STATE.synSession !== sessionToken : STATE.trainSession !== sessionToken) return null;
+
+    const shift = mvc.adaln_shift[layer].forward(voiceVec);
+    const scale = mvc.adaln_scale[layer].forward(voiceVec);
+
+    // Forward pass — chunked: yield every YIELD_EVERY phonemes
+    const fwd = new Float32Array(nPh * D);
+    let hF = new Float32Array(D);
+    for (let t = 0; t < nPh; t++) {
+      if (t > 0 && t % YIELD_EVERY === 0) {
+        await yieldToMain();
+        if (useSynSession ? STATE.synSession !== sessionToken : STATE.trainSession !== sessionToken) return null;
+      }
+      const xin  = seq.subarray(t*D, (t+1)*D);
+      const gate = mvc.Wup[layer].forward(xin);
+      const xg   = gate.subarray(0, D);
+      const sg   = gate.subarray(D);
+      const dB   = mvc.B[layer].forward(xg);
+      const Av   = mvc.A_log[layer].forward(xg);
+      for (let i = 0; i < D; i++) {
+        const dA = Math.exp(-Math.exp(Math.max(-8, Math.min(0, Av[i]))));
+        hF[i] = dA * hF[i] + dB[i];
+      }
+      const y = mvc.C[layer].forward(hF);
+      for (let i = 0; i < D; i++) {
+        const sig = 1 / (1 + Math.exp(-sg[i]));
+        fwd[t*D+i] = (y[i] * (1 + scale[i]*0.1) + shift[i]*0.05) * sig;
+      }
+    }
+
+    await yieldToMain();
+    if (useSynSession ? STATE.synSession !== sessionToken : STATE.trainSession !== sessionToken) return null;
+
+    // Backward pass — chunked
+    const bwd = new Float32Array(nPh * D);
+    let hB = new Float32Array(D);
+    for (let t = nPh - 1; t >= 0; t--) {
+      if ((nPh - 1 - t) % YIELD_EVERY === 0 && t < nPh - 1) {
+        await yieldToMain();
+        if (useSynSession ? STATE.synSession !== sessionToken : STATE.trainSession !== sessionToken) return null;
+      }
+      const xin  = seq.subarray(t*D, (t+1)*D);
+      const gate = mvc.Wup[layer].forward(xin);
+      const xg   = gate.subarray(0, D);
+      const sg   = gate.subarray(D);
+      const dB   = mvc.B[layer].forward(xg);
+      const Av   = mvc.A_log[layer].forward(xg);
+      for (let i = 0; i < D; i++) {
+        const dA = Math.exp(-Math.exp(Math.max(-8, Math.min(0, Av[i]))));
+        hB[i] = dA * hB[i] + dB[i];
+      }
+      const y = mvc.C[layer].forward(hB);
+      for (let i = 0; i < D; i++) {
+        const sig = 1 / (1 + Math.exp(-sg[i]));
+        bwd[t*D+i] = (y[i] * (1 + scale[i]*0.1) + shift[i]*0.05) * sig;
+      }
+    }
+
+    // Merge + residual
+    const next = new Float32Array(nPh * D);
+    for (let i = 0; i < nPh * D; i++) next[i] = seq[i] + (fwd[i] + bwd[i]) * 0.5;
+    seq = next;
+
+    await yieldToMain();
+    if (useSynSession ? STATE.synSession !== sessionToken : STATE.trainSession !== sessionToken) return null;
+  }
+
+  LOG.dim('MVC expansion + mel projection...');
+  await yieldToMain();
+  if (useSynSession ? STATE.synSession !== sessionToken : STATE.trainSession !== sessionToken) return null;
+
+  // ── Step 3: Duration expansion (use synchronous path from mvc.forward internals)
+  // For mobile we use simple linear expansion — fast, good enough
+  const expanded = new Float32Array(nFrames * D);
+  for (let f = 0; f < nFrames; f++) {
+    const progress = f / Math.max(nFrames - 1, 1);
+    const phF = progress * (nPh - 1);
+    const phLo = Math.floor(phF), phHi = Math.min(nPh - 1, phLo + 1);
+    const alpha = phF - phLo;
+    for (let d = 0; d < D; d++)
+      expanded[f*D+d] = seq[phLo*D+d] * (1 - alpha) + seq[phHi*D+d] * alpha;
+    if (f % (YIELD_EVERY * 4) === 0 && f > 0) {
+      await yieldToMain();
+      if (useSynSession ? STATE.synSession !== sessionToken : STATE.trainSession !== sessionToken) return null;
+    }
+  }
+
+  await yieldToMain();
+  if (useSynSession ? STATE.synSession !== sessionToken : STATE.trainSession !== sessionToken) return null;
+
+  // ── Step 4: Mel projection — chunked
+  const [f0C, f0R, breath, fShift, fAg, tilt, mora, weight, reg, ageT] = voiceVec;
+  const mel = new Float32Array(nFrames * NM);
+  for (let f = 0; f < nFrames; f++) {
+    if (f % YIELD_EVERY === 0 && f > 0) {
+      await yieldToMain();
+      if (useSynSession ? STATE.synSession !== sessionToken : STATE.trainSession !== sessionToken) return null;
+    }
+    const frame = mvc.W_out.forward(expanded.subarray(f*D, (f+1)*D));
+    for (let m = 0; m < NM; m++) {
+      const mN = m / NM;
+      const f0Shape     = Math.exp(-0.5 * ((mN - (f0C*0.6+0.1)) / 0.15)**2) * f0R * 0.35;
+      const breathShape = breath * 0.22 * (1 - mN * 0.6);
+      const f1 = 0.15 + fShift*0.30, f2 = 0.35 + fShift*0.20, f3 = 0.55 + fShift*0.10;
+      const formantShape = (
+        Math.exp(-0.5*((mN-f1)/0.09)**2) +
+        Math.exp(-0.5*((mN-f2)/0.07)**2)*0.7 +
+        Math.exp(-0.5*((mN-f3)/0.06)**2)*0.4
+      ) * fAg * 0.28;
+      const tiltShape   = (tilt - 0.5) * 0.32 * (mN - 0.5);
+      const weightShape = weight * 0.22 * Math.exp(-0.5*((mN-0.35)/0.18)**2);
+      const ageShape    = ageT * 0.08 * (mN*mN) * Math.sin(f*0.3+m*0.7) * 0.3;
+      const progress    = f / Math.max(nFrames-1, 1);
+      const prosody     = 1 + 0.15 * Math.sin(Math.PI*progress) * f0R;
+      mel[f*NM+m] = Math.tanh(
+        (frame[m]*0.3 + f0Shape + breathShape + formantShape + tiltShape + weightShape + ageShape)
+        * prosody
+      );
+    }
+  }
+
+  LOG.ok(`MVC forward complete (${nFrames} frames, chunked async)`);
+  return mel;
+}
+
+// Async Griffin-Lim — yields between iterations
+async function griffinLimAsync(melSpec, nFrames, nIter, mySession) {
+  const { sr, hop, n_fft, n_mels } = CFG;
+  const nBins    = n_fft / 2 + 1;
+  const nSamples = (nFrames + 1) * hop;
+
+  const linMel = new Float32Array(nFrames * n_mels);
+  for (let i = 0; i < linMel.length; i++) linMel[i] = Math.exp(Math.min(melSpec[i], 10));
+  const linSpec = melToLinSpec(linMel, nFrames, n_mels, nBins);
+
+  let phase = new Float32Array(nFrames * nBins);
+  for (let i = 0; i < phase.length; i++) phase[i] = Math.random() * 2 * Math.PI;
+
+  let signal = new Float32Array(nSamples);
+
+  for (let iter = 0; iter < nIter; iter++) {
+    // Yield every iteration on mobile, every 4 on desktop
+    if (iter % (IS_MOBILE ? 1 : 4) === 0) {
+      await yieldToMain();
+      if (STATE.synSession !== mySession) return null;
+      LOG.dim(`GL iter ${iter+1}/${nIter}...`);
+    }
+
+    const re = new Float32Array(nFrames * nBins);
+    const im = new Float32Array(nFrames * nBins);
+    for (let f = 0; f < nFrames; f++) {
+      for (let b = 0; b < nBins; b++) {
+        const mg = Math.max(0, linSpec[f * nBins + b]);
+        re[f * nBins + b] = mg * Math.cos(phase[f * nBins + b]);
+        im[f * nBins + b] = mg * Math.sin(phase[f * nBins + b]);
+      }
+    }
+    signal = istft(re, im, nFrames, nBins, n_fft, hop);
+    if (iter < nIter - 1) {
+      const { re: r2, im: i2 } = stft(signal, nFrames, nBins, n_fft, hop);
+      for (let f = 0; f < nFrames; f++)
+        for (let b = 0; b < nBins; b++)
+          phase[f * nBins + b] = Math.atan2(i2[f * nBins + b], r2[f * nBins + b]);
+    }
+  }
+  return signal;
+}
+
+async function synthesize() {
+  if (REC.training) {
+    LOG.warn("Training in progress – wait for completion before synthesizing.");
+    return;
+  }
+  if (STATE.playing) return;
+  const text = document.getElementById('text-input').value.trim();
+  if (!text) return;
+  STATE.playing = true;
+  STATE.synSession++;
+  const mySession = STATE.synSession;
+
+  setSys('SYNTHESIZING', 'working');
+  document.getElementById('btn-synth').disabled = true;
+  document.getElementById('btn-stop').classList.remove('hidden');
+  omniPost('synthStart', { text: text.slice(0, 80) });
+
+  const langSel = document.getElementById('lang-sel').value;
+  const rate    = parseFloat(document.getElementById('rate-sl').value);
+  const pitchSh = parseFloat(document.getElementById('pitch-sl').value);
+
+  // G2P
+  LOG.info(`G2P [${langSel}]: ${text.length} chars`);
+  const g2pFn   = G2P[langSel] || G2P.en;
+  const phonemes = g2pFn(text);
+  renderPhonemeStrip(phonemes);
+
+  // Build phoneme index sequence and compute duration
+  const phIdxs  = phonemes.map(p => PHONEMES[p] ? PHONEMES[p].idx : 0);
+  let totalMs   = 0;
+  phonemes.forEach(p => { if (PHONEMES[p]) totalMs += PHONEMES[p].dur / rate; });
+  let nFrames = Math.max(8, Math.ceil(totalMs / 1000 * CFG.sr / CFG.hop));
+
+  // Mobile frame cap — prevent script timeout on Android Chrome
+  if (IS_MOBILE && nFrames > MOBILE_FRAME_CAP) {
+    LOG.warn(`Mobile: capping ${nFrames} → ${MOBILE_FRAME_CAP} frames (~${(MOBILE_FRAME_CAP * CFG.hop / CFG.sr).toFixed(1)}s). Shorten text for full output.`);
+    nFrames = MOBILE_FRAME_CAP;
+    totalMs = nFrames * CFG.hop / CFG.sr * 1000;
+  }
+
+  LOG.dim(`${phonemes.length} phonemes → ${nFrames} mel frames · ${(totalMs/1000).toFixed(2)}s${IS_MOBILE ? ' [mobile-capped]' : ''}`);
+  document.getElementById('mel-frames').textContent = nFrames;
+  document.getElementById('mel-dur').textContent    = (totalMs/1000).toFixed(2) + 's';
+
+  await yieldToMain();
+  if (STATE.synSession !== mySession) return;
+
+  // MVC forward (async — yields after SSM to avoid mobile timeout)
+  LOG.info(`MVC forward (d=${STATE.mvc.dModel}, L=${STATE.mvc.nLayers})${IS_MOBILE ? ' [mobile]' : ''}...`);
+  const voiceVec = new Float32Array(STATE.voiceVec);
+  const mel      = await mvcForwardAsync(phIdxs, nFrames, voiceVec, mySession, true);
+  if (!mel) return;
+  STATE.lastMel  = mel;
+
+  // Draw mel
+  drawMelCanvas(mel, nFrames, CFG.n_mels);
+  await yieldToMain();
+  if (STATE.synSession !== mySession) return;
+
+  // ── VOCODER ──────────────────────────────────────────────────────────────
+  let pcm;
+  if (STATE.useNeuralVocoder && STATE.vocoder) {
+    LOG.info(`Neural vocoder (HiFi-GAN BitLinear, ${VOC.STAGES} stages × ${VOC.UP}×)...`);
+    document.getElementById('gl-tag').textContent   = 'NEURAL';
+    document.getElementById('vocoder-label').textContent = 'NEURAL';
+
+    // Yield chunks through the 3 stages so UI doesn't freeze
+    await yieldToMain();
+    if (STATE.synSession !== mySession) return;
+
+    const rawPCM   = STATE.vocoder.forward(mel, nFrames, voiceVec);
+    // The vocoder output is nFrames × UP² long (two UP stages of interp + one transform stage)
+    // Target: nFrames × CFG.hop samples (= totalMs/1000 × CFG.sr)
+    const targetLen = nFrames * CFG.hop;
+    pcm = new Float32Array(targetLen);
+
+    // Resample rawPCM to targetLen via linear interp (simple, no artifacts for small ratio changes)
+    const ratio = rawPCM.length / targetLen;
+    for (let i = 0; i < targetLen; i++) {
+      const fp = i * ratio;
+      const lo = Math.floor(fp), hi = Math.min(lo + 1, rawPCM.length - 1);
+      pcm[i]   = rawPCM[lo] + (rawPCM[hi] - rawPCM[lo]) * (fp - lo);
+    }
+
+    await yieldToMain();
+    if (STATE.synSession !== mySession) return;
+
+    // Post-process: normalize + gentle softclip
+    let maxAbs = 1e-9;
+    for (let i = 0; i < pcm.length; i++) maxAbs = Math.max(maxAbs, Math.abs(pcm[i]));
+    const normScale = 0.75 / maxAbs;
+    for (let i = 0; i < pcm.length; i++) pcm[i] = Math.tanh(pcm[i] * normScale);
+
+    // Voice-conditioned post-processing (breathiness, spectral tilt, age texture)
+    const [f0C, f0R, breath, fShift, fAg, tilt, mora, weight, reg, ageT] = voiceVec;
+    const lpA = 0.88 - fAg * 0.20 - tilt * 0.15;
+    let lp1 = 0;
+    for (let i = 0; i < pcm.length; i++) {
+      let s = pcm[i];
+      lp1 = lp1 * lpA + s * (1 - lpA);
+      s   = s + (s - lp1) * fAg * 0.4;
+      s  += (Math.random() * 2 - 1) * breath * 0.08;
+      if (ageT > 0.3 && i % 3 === 0) s += ageT * 0.015 * (Math.random() * 2 - 1);
+      if (weight > 0.5) s = Math.tanh(s * (1 + weight * 0.3)) / (1 + weight * 0.3);
+      pcm[i] = Math.tanh(s * 1.1);
+    }
+
+    LOG.ok(`Neural vocoder: ${rawPCM.length} → ${targetLen} samples`);
+
+  } else {
+    // Griffin-Lim fallback
+    const glIters = parseInt(document.getElementById('gl-sl').value);
+    if (IS_MOBILE) {
+      LOG.info(`Mobile: Griffin-Lim (8 iters, async chunked)...`);
+      document.getElementById('gl-tag').textContent = 'GL-MOBILE';
+    } else {
+      LOG.warn(`Falling back to Griffin-Lim (${glIters} iterations)...`);
+      document.getElementById('gl-tag').textContent = 'GL-FALLBACK';
+    }
+    document.getElementById('gl-fallback-status').textContent = 'active';
+    document.getElementById('gl-fallback-status').style.color = 'var(--gold)';
+
+    // Mobile: fewer iterations + async; Desktop: original iteration count
+    const glItersFinal = IS_MOBILE ? Math.min(glIters, 8) : glIters;
+    const pcmRaw = await griffinLimAsync(mel, nFrames, glItersFinal, mySession);
+    if (!pcmRaw) return;
+
+    // Find actual signal range
+    let maxAbs = 0;
+    for (let i = 0; i < pcmRaw.length; i++) maxAbs = Math.max(maxAbs, Math.abs(pcmRaw[i]));
+
+    pcm = new Float32Array(pcmRaw.length);
+
+    // On mobile with no .pop2 loaded, random-init MVC produces signal too weak
+    // to survive normalization. Generate carrier tone unconditionally on mobile
+    // unless signal is strong (i.e. a .pop2 has been trained/loaded).
+    const pop2Loaded = document.getElementById('pop2-status')?.textContent !== 'not loaded';
+    const signalStrong = maxAbs > 0.01; // threshold for "real" trained signal
+
+    if (IS_MOBILE && !signalStrong && !pop2Loaded) {
+      // Carrier tone — voiced buzz so user hears the pipeline is alive
+      LOG.warn('Random init signal too weak — generating carrier tone (load a .pop2 for real synthesis)');
+      const [f0C] = voiceVec;
+      const baseFreq = 80 + f0C * 200;
+      const nSamples = Math.max(pcmRaw.length, Math.floor(CFG.sr * 1.5));
+      pcm = new Float32Array(nSamples);
+      for (let i = 0; i < pcm.length; i++) {
+        const t = i / CFG.sr;
+        pcm[i] = Math.tanh(
+          Math.sin(2 * Math.PI * baseFreq * t) * 0.45 +
+          Math.sin(2 * Math.PI * baseFreq * 2 * t) * 0.25 +
+          Math.sin(2 * Math.PI * baseFreq * 3 * t) * 0.12 +
+          Math.sin(2 * Math.PI * baseFreq * 4 * t) * 0.06 +
+          (Math.random() * 2 - 1) * 0.04
+        ) * 0.7;
+      }
+      LOG.ok(`Carrier tone: ${baseFreq.toFixed(0)}Hz · ${(pcm.length/CFG.sr).toFixed(2)}s`);
+    } else {
+      // Real signal or .pop2 loaded — normalize to audible level
+      if (maxAbs < 1e-9) maxAbs = 1e-9;
+      const normScale = 0.85 / maxAbs;
+      // Boost: trained signal needs less boost than random noise
+      const boost = signalStrong ? 1.5 : 12.0;
+      for (let i = 0; i < pcmRaw.length; i++) {
+        pcm[i] = Math.tanh(pcmRaw[i] * normScale * boost);
+      }
+    }
+  }
+
+  STATE.lastPCM = pcm;
+  drawWaveCanvas(pcm);
+  // Auto-prepare WAV download link on mobile immediately after synthesis
+  // so it's ready before AudioContext playback attempt
+  if (IS_MOBILE) {
+    try { exportWAV(); } catch(e) {}
+  }
+
+  await yieldToMain();
+  if (STATE.synSession !== mySession) return;
+
+  // Ensure AudioContext is running before playback (mobile may have suspended it)
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+      LOG.dim('AudioContext resumed before playback');
+    }
+  } catch(e) {}
+
+  // Playback
+  LOG.ok(`Synthesis complete: ${pcm.length} samples @ ${CFG.sr}Hz`);
+  setSys('PLAYING', 'live');
+
+  const progress = document.getElementById('progress-bar');
+  const durMs    = (pcm.length / CFG.sr) * 1000;
+  progress.style.transition = `width ${durMs}ms linear`;
+  progress.style.width = '100%';
+
+  await playPCM(pcm, CFG.sr);
+
+  if (STATE.synSession !== mySession) return;
+  progress.style.transition = 'none';
+  progress.style.width = '0%';
+
+  setSys('READY', 'live');
+  STATE.playing = false;
+  document.getElementById('btn-synth').disabled = false;
+  document.getElementById('btn-stop').classList.add('hidden');
+  omniPost('synthEnd', { duration_s: (pcm.length / CFG.sr).toFixed(2) });
+}
+
+function stopCursorAnimation() {
+  if (CURSOR.raf) {
+    cancelAnimationFrame(CURSOR.raf);
+    CURSOR.raf = null;
+  }
+  const cursor = document.getElementById('wave-cursor');
+  if (cursor) cursor.style.display = 'none';
+  CURSOR.active = false;
+}
+
+function stopSynthesis() {
+  stopCursorAnimation();
+  STATE.synSession++;
+  STATE.playing = false;
+  if (STATE.audioCtx) STATE.audioCtx.suspend();
+  setSys('READY', 'live');
+  document.getElementById('btn-synth').disabled = false;
+  document.getElementById('btn-stop').classList.add('hidden');
+  document.getElementById('progress-bar').style.width = '0%';
+  LOG.warn('Synthesis stopped');
+}
+
+function exportWAV() {
+  if (!STATE.lastPCM) { LOG.warn('Nothing to export — synthesize first'); return; }
+  const blob = encodeWAV(STATE.lastPCM, CFG.sr);
+  const url  = URL.createObjectURL(blob);
+  const fname = `omnivocal_${Date.now()}.wav`;
+
+  if (IS_MOBILE) {
+    // Android blocks programmatic a.click() downloads — show a tappable link instead
+    const existingLink = document.getElementById('wav-dl-link');
+    if (existingLink) existingLink.remove();
+    const a = document.createElement('a');
+    a.id = 'wav-dl-link';
+    a.href = url;
+    a.download = fname;
+    a.textContent = '⬇ TAP TO SAVE WAV';
+    a.style.cssText = `
+      display:block; margin:8px 0 0; padding:10px 16px;
+      background:var(--green); color:#000;
+      font-family:'Space Mono',monospace; font-size:12px; font-weight:700;
+      text-decoration:none; letter-spacing:1px; text-align:center;
+    `;
+    // Insert below the export button
+    const btn = document.getElementById('btn-export');
+    btn.parentNode.insertBefore(a, btn.nextSibling);
+    LOG.ok('WAV ready — tap the green button to save');
+    // Also try programmatic click as a backup (works on some Android versions)
+    try { a.click(); } catch(e) {}
+  } else {
+    // Desktop: programmatic click works fine
+    const a = document.createElement('a');
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    LOG.ok('WAV exported');
+  }
+}
+
+// ── VOICE SPACE UI ────────────────────────────────────────────────────────
+function buildAxisSliders() {
+  const container = document.getElementById('axis-sliders');
+  container.innerHTML = '';
+  STATE.voiceVec = new Float32Array(AXES.map(a => a.default));
+
+  AXES.forEach((ax, i) => {
+    const row = document.createElement('div');
+    row.className = 'axis-row';
+    row.innerHTML = `
+      <span class="axis-label">${ax.label}</span>
+      <input type="range" class="axis-slider" min="0" max="100" value="${Math.round(ax.default*100)}" data-i="${i}">
+      <span class="axis-val" id="axv-${i}">${ax.default.toFixed(2)}</span>
+    `;
+    container.appendChild(row);
+    row.querySelector('input').addEventListener('input', e => {
+      const v = parseInt(e.target.value) / 100;
+      STATE.voiceVec[i] = v;
+      document.getElementById(`axv-${i}`).textContent = v.toFixed(2);
+      document.getElementById('voice-desc').textContent = describeVoice(Array.from(STATE.voiceVec));
+    });
+  });
+
+  document.getElementById('voice-desc').textContent = describeVoice(Array.from(STATE.voiceVec));
+}
+
+function buildParamSliders() {
+  document.getElementById('rate-sl').addEventListener('input', e => {
+    document.getElementById('rate-val').textContent = parseFloat(e.target.value).toFixed(2) + 'x';
+  });
+  document.getElementById('pitch-sl').addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    document.getElementById('pitch-val').textContent = (v >= 0 ? '+' : '') + v.toFixed(1);
+  });
+  document.getElementById('gl-sl').addEventListener('input', e => {
+    document.getElementById('gl-val').textContent = e.target.value;
+  });
+  document.getElementById('layers-sl').addEventListener('input', e => {
+    const L = parseInt(e.target.value);
+    document.getElementById('layers-val').textContent = L;
+    document.getElementById('mvc-l').textContent = L;
+    rebuildMVC(L);
+  });
+}
+
+function rebuildMVC(nLayers) {
+  LOG.info(`Rebuilding MVC: d=128, L=${nLayers}...`);
+  setSys('BUILDING MODEL', 'working');
+  setTimeout(() => {
+    STATE.mvc = new MVCModel(128, nLayers, CFG.n_mels, 10);
+    const nParams = STATE.mvc.getLinearLayers().reduce((s, l) => s + l.weight.length, 0);
+    LOG.ok(`MVC ready: ${nParams.toLocaleString()} parameters (BitLinear ternary)`);
+    // Also reinit duration model — its weights are independent of MVC depth
+    // but if training has already occurred, stale duration weights against a
+    // new MVC init is misleading. Reset to fresh structured init.
+    STATE.durModel = new DurationModel();
+    initNearZero(STATE.durModel.W1, 0.05);
+    LOG.dim('Duration model reinitialized alongside MVC');
+    setSys('READY', 'live');
+  }, 10);
+}
+
+// ── POSTMESSAGE API — Phase 5 full implementation ─────────────────────────
+// Supports embedding OmniVocal in an iframe and controlling it from the host.
+// All messages use the shape: { target: 'omnivocal', action: '...', ...params }
+// Responses use: { source: 'omnivocal', action: '...', ...data }
+//
+// Supported actions (host → OmniVocal):
+//   speak          { text, lang?, rate?, voiceVec? }
+//   stop           {}
+//   getStatus      {}           → responds with status object
+//   getVoiceVec    {}           → responds with current voice_vector
+//   setVoiceVec    { vec }      → sets voice vector, updates sliders
+//   loadPop2       { json }     → load .pop2 from JSON string
+//   loadPop2Url    { url }      → fetch + load .pop2 from URL
+//   exportPop2     {}           → responds with pop2 JSON string
+//   reset          {}           → rebuild MVC + vocoder + duration model fresh
+//
+// Events OmniVocal emits to parent (if embedded):
+//   ready          fires on init complete
+//   synthStart     fires when synthesis begins
+//   synthEnd       fires when synthesis + playback complete
+//   error          fires on any error
+// ─────────────────────────────────────────────────────────────────────────
+
+function omniPost(action, data = {}) {
+  // Send to parent if embedded in iframe, otherwise ignore
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ source: 'omnivocal', action, ...data }, '*');
+  }
+}
+
+// Public JS API (for same-origin access without postMessage)
+window.omnivocal = {
+  speak: async (text, options = {}) => {
+    if (options.lang)     document.getElementById('lang-sel').value = options.lang;
+    if (options.rate)     { document.getElementById('rate-sl').value = options.rate; document.getElementById('rate-val').textContent = parseFloat(options.rate).toFixed(2) + 'x'; }
+    if (options.voiceVec) { STATE.voiceVec = new Float32Array(options.voiceVec); syncVoiceSliders(); }
+    document.getElementById('text-input').value = text;
+    await synthesize();
+  },
+
+  stop: () => stopSynthesis(),
+
+  getStatus: () => ({
+    version:          '0.6-phase6',
+    dModel:           STATE.mvc?.dModel,
+    nLayers:          STATE.mvc?.nLayers,
+    vocoder:          STATE.useNeuralVocoder ? 'hifigan-bitlinear' : 'griffin-lim-fallback',
+    vocoderStages:    VOC.STAGES,
+    durationModel:    'mlp-2layer-bitlinear',
+    pop2Loaded:       document.getElementById('pop2-status')?.textContent || null,
+    playing:          STATE.playing,
+  }),
+
+  getVoiceVec: () => Array.from(STATE.voiceVec),
+
+  setVoiceVec: (vec) => {
+    if (!vec || vec.length !== 10) { LOG.warn('setVoiceVec: need Float32Array[10]'); return; }
+    STATE.voiceVec = new Float32Array(vec);
+    syncVoiceSliders();
+    document.getElementById('voice-desc').textContent = describeVoice(Array.from(STATE.voiceVec));
+    LOG.ok('Voice vector updated via API');
+  },
+
+  loadPop2: async (jsonStr) => {
+    const file = new File([jsonStr], 'api.pop2', { type: 'application/json' });
+    await loadPop2(file);
+  },
+
+  loadPop2Url: async (url) => {
+    LOG.info(`Fetching .pop2 from: ${url}`);
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.text();
+      const file = new File([json], url.split('/').pop() || 'remote.pop2', { type: 'application/json' });
+      await loadPop2(file);
+      omniPost('pop2Loaded', { name: url.split('/').pop() });
+    } catch(e) {
+      LOG.err(`loadPop2Url failed: ${e.message}`);
+      omniPost('error', { message: e.message });
+    }
+  },
+
+  exportPop2Json: async () => {
+    // Returns .pop2 as JSON string (for postMessage API) without triggering download
+    const mvcLayers     = getMVCLayers();
+    const vocCondLayers = getVocoderConditioningLayers();
+    const snakeAlphas   = STATE.vocoder.getAllAlphas();
+    const baseHash      = await computeBaseModelHash();
+    const name          = document.getElementById('pop2-name')?.value?.trim() || 'api-export';
+    const pop2 = {
+      magic:   'POP2',
+      version: '1.0',
+      name,
+      description:          describeVoice(Array.from(STATE.voiceVec)),
+      voice_vector:         Array.from(STATE.voiceVec),
+      mvc_weights:          serializeLayers(mvcLayers),
+      vocoder_conditioning: serializeLayers(vocCondLayers),
+      duration_model:       serializeLayers(STATE.durModel.getLayers()),
+      snake_alphas:         snakeAlphas.map(a => Array.from(a)),
+      base_model_hash:      baseHash,
+      sample_meta:          STATE.pop2SampleMeta   || { duration_s: 0, sample_count: 0 },
+      training_meta:        STATE.pop2TrainingMeta || { loss_final: null, epochs: 0, trained_at: new Date().toISOString() },
+    };
+    return JSON.stringify(pop2);
+  },
+
+  reset: () => {
+    LOG.info('API reset: rebuilding models...');
+    STATE.mvc      = new MVCModel(128, 2, CFG.n_mels, 10);
+    STATE.vocoder  = new NeuralVocoder(CFG.n_mels, 10);
+    STATE.durModel = new DurationModel();
+    applyPrincipledBaseInit(STATE.mvc, STATE.vocoder);
+    initNearZero(STATE.durModel.W1, 0.05);
+    LOG.ok('Models reset to base initialization');
+    omniPost('reset', {});
+  },
+};
+
+// postMessage listener — full dispatch
+window.addEventListener('message', async e => {
+  const d = e.data;
+  if (!d || d.target !== 'omnivocal') return;
+  const reply = (action, data) => {
+    // Reply to sender origin if possible, else '*'
+    const origin = e.origin || '*';
+    try { e.source?.postMessage({ source: 'omnivocal', action, ...data }, origin); }
+    catch(_) { omniPost(action, data); }
+  };
+
+  try {
+    switch (d.action) {
+      case 'speak':
+        await window.omnivocal.speak(d.text, { lang: d.lang, rate: d.rate, voiceVec: d.voiceVec });
+        break;
+      case 'stop':
+        window.omnivocal.stop();
+        break;
+      case 'getStatus':
+        reply('status', { status: window.omnivocal.getStatus() });
+        break;
+      case 'getVoiceVec':
+        reply('voiceVec', { vec: window.omnivocal.getVoiceVec() });
+        break;
+      case 'setVoiceVec':
+        window.omnivocal.setVoiceVec(d.vec);
+        reply('voiceVecSet', { ok: true });
+        break;
+      case 'loadPop2':
+        await window.omnivocal.loadPop2(d.json);
+        reply('pop2Loaded', { ok: true });
+        break;
+      case 'loadPop2Url':
+        await window.omnivocal.loadPop2Url(d.url);
+        break;
+      case 'exportPop2':
+        const json = await window.omnivocal.exportPop2Json();
+        reply('pop2Export', { json });
+        break;
+      case 'reset':
+        window.omnivocal.reset();
+        reply('resetDone', { ok: true });
+        break;
+      default:
+        LOG.warn(`Unknown postMessage action: ${d.action}`);
+    }
+  } catch(err) {
+    LOG.err(`postMessage handler error: ${err.message}`);
+    reply('error', { message: err.message });
+  }
+});
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+function init() {
+  LOG.dim('OmniVocal Phase 6 initializing...');
+  LOG.dim('Ed Interim / Vael Interim · ConsciousNode SoftWorks');
+  LOG.dim('24kHz · N_FFT=1024 · 80 mel bands · HOP=256');
+
+  buildMelFilters();
+  buildAxisSliders();
+  buildParamSliders();
+
+  // Build MVC
+  LOG.info('Building MVCModel (d=128, L=2, BitLinear ternary)...');
+  STATE.mvc = new MVCModel(128, 2, CFG.n_mels, 10);
+  const nParams = STATE.mvc.getLinearLayers().reduce((s, l) => s + l.weight.length, 0);
+  LOG.ok(`MVC ready: ${nParams.toLocaleString()} parameters`);
+
+  // Build Neural Vocoder
+  LOG.info(`Building NeuralVocoder (HiFi-GAN BitLinear · ${VOC.STAGES} stages · ${VOC.D}d)...`);
+  STATE.vocoder = new NeuralVocoder(CFG.n_mels, 10);
+  const vParams = STATE.vocoder.getAllLayers().reduce((s, l) => s + l.weight.length, 0);
+  LOG.ok(`Neural vocoder ready: ${vParams.toLocaleString()} parameters (BitLinear ternary)`);
+
+  // Build Duration Model
+  LOG.info('Building DurationModel (2-layer BitLinear MLP, learned per-phoneme timing)...');
+  STATE.durModel = new DurationModel();
+  const dParams  = STATE.durModel.getLayers().reduce((s, l) => s + l.weight.length, 0);
+  LOG.ok(`Duration model ready: ${dParams.toLocaleString()} parameters · cosine-interp expansion`);
+  LOG.ok('Griffin-Lim fallback standing by (toggle via ⚡ button)');
+  LOG.ok('G2P loaded: English + Japanese + Korean + Spanish + German + French + Russian');
+  LOG.ok('ConsciousNode names registered: omnivocal, kham, kehai, vael, pixie + 12 more');
+
+  document.getElementById('btn-synth').addEventListener('click', async () => {
+    // Pre-unlock AudioContext on mobile — Chrome requires gesture proximity
+    try {
+      const ctx = getAudioCtx();
+      if (ctx.state === 'suspended') await ctx.resume();
+      // Play a silent buffer to fully unlock
+      const silBuf = ctx.createBuffer(1, 1, ctx.sampleRate);
+      const silSrc = ctx.createBufferSource();
+      silSrc.buffer = silBuf;
+      silSrc.connect(ctx.destination);
+      silSrc.start();
+      LOG.dim('AudioContext unlocked');
+    } catch(e) { LOG.warn('AudioContext pre-unlock failed: ' + e.message); }
+    synthesize();
+  });
+  document.getElementById('btn-stop').addEventListener('click', stopSynthesis);
+  document.getElementById('btn-export').addEventListener('click', exportWAV);
+
+  // Vocoder toggle
+  const vocBtn = document.getElementById('btn-vocoder-toggle');
+  vocBtn.addEventListener('click', () => {
+    STATE.useNeuralVocoder = !STATE.useNeuralVocoder;
+    if (STATE.useNeuralVocoder) {
+      vocBtn.textContent = '⚡ NEURAL VOC';
+      vocBtn.style.borderColor = '';
+      vocBtn.style.color = '';
+      document.getElementById('gl-tag').textContent = 'HIFI-GAN';
+      document.getElementById('vocoder-label').textContent = 'NEURAL';
+      document.getElementById('gl-fallback-status').textContent = 'standby';
+      document.getElementById('gl-fallback-status').style.color = 'var(--dim)';
+      LOG.info('Vocoder: neural (HiFi-GAN BitLinear)');
+    } else {
+      vocBtn.textContent = '〰 GRIFFIN-LIM';
+      vocBtn.style.borderColor = 'var(--gold)';
+      vocBtn.style.color = 'var(--gold)';
+      document.getElementById('gl-tag').textContent = 'GL-FALLBACK';
+      document.getElementById('vocoder-label').textContent = 'GL-FALLBACK';
+      LOG.warn('Vocoder: Griffin-Lim fallback active');
+    }
+  });
+
+  // Resize canvases on window resize
+  window.addEventListener('resize', () => {
+    if (STATE.lastMel) drawMelCanvas(STATE.lastMel, parseInt(document.getElementById('mel-frames').textContent)||0, CFG.n_mels);
+    if (STATE.lastPCM) drawWaveCanvas(STATE.lastPCM);
+  });
+
+  // Apply principled base initialization (structured > random noise)
+  LOG.info('Applying principled base initialization...');
+  applyPrincipledBaseInit(STATE.mvc, STATE.vocoder);
+  // Duration model: W1 keeps He init; W2 already biased toward ~100ms in constructor
+  initNearZero(STATE.durModel.W1, 0.05);
+  LOG.ok('Base init complete — MVC + vocoder + duration model initialized');
+
+  initPopStudio();
+  initTabs();
+  initPlaybackCursor();
+  initMelZoom();
+
+  setSys('READY', 'live');
+  LOG.ok('Phase 6 ready — tabbed UI · Pop Studio surfaced · playback cursor · mel zoom');
+  LOG.dim('Pop Studio: ★ Studio tab in right panel');
+}
+
+// ── SHA-256 ───────────────────────────────────────────────────────────────
+async function sha256hex(data) {
+  const buf = data instanceof Uint8Array ? data.buffer : data;
+  const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// Hash the current base model (MVC + vocoder init weights) for .pop2 provenance
+async function computeBaseModelHash() {
+  const layers = [
+    ...STATE.mvc.getLinearLayers(),
+    ...STATE.vocoder.getAllLayers()
+  ];
+  // Concatenate all ternary weight buffers
+  let total = 0;
+  for (const l of layers) total += l.weight.length;
+  const flat = new Int8Array(total);
+  let off = 0;
+  for (const l of layers) { flat.set(l.weight, off); off += l.weight.length; }
+  return sha256hex(new Uint8Array(flat.buffer));
+}
+
+// ── VOICE ANALYSIS — F0 (YIN), spectral features → voice_vector[10] ───────
+function analyzeVoiceRecording(pcmFloat32, sr) {
+  // Returns voice_vector Float32Array[10]:
+  // [f0_range, breathiness, spectral_tilt, formant_shift, formant_agility,
+  //  jitter, mora_timing, vocal_weight, register, age_texture]
+
+  const N = pcmFloat32.length;
+
+  // ── F0 via simplified YIN (autocorrelation-based) ──
+  const minPeriod = Math.floor(sr / 400); // 400 Hz max
+  const maxPeriod = Math.floor(sr / 60);  // 60 Hz min
+  const frameSize = 2048;
+  const hopA = 512;
+  const f0s = [];
+
+  for (let start = 0; start + frameSize < N; start += hopA) {
+    const frame = pcmFloat32.subarray(start, start + frameSize);
+    // Difference function
+    const d = new Float32Array(maxPeriod);
+    for (let tau = minPeriod; tau < maxPeriod; tau++) {
+      let sum = 0;
+      for (let i = 0; i < frameSize - maxPeriod; i++) {
+        const diff = frame[i] - frame[i + tau];
+        sum += diff * diff;
+      }
+      d[tau] = sum;
+    }
+    // Cumulative mean normalized difference
+    let runSum = 0;
+    const cmnd = new Float32Array(maxPeriod);
+    cmnd[0] = 1;
+    for (let tau = 1; tau < maxPeriod; tau++) {
+      runSum += d[tau];
+      cmnd[tau] = runSum > 0 ? (d[tau] * tau) / runSum : 1;
+    }
+    // Find first dip below threshold
+    let bestTau = -1;
+    for (let tau = minPeriod; tau < maxPeriod - 1; tau++) {
+      if (cmnd[tau] < 0.15 && cmnd[tau] < cmnd[tau + 1]) { bestTau = tau; break; }
+    }
+    if (bestTau > 0) f0s.push(sr / bestTau);
+  }
+
+  const f0Mean = f0s.length ? f0s.reduce((a,b)=>a+b,0)/f0s.length : 150;
+  const f0Std  = f0s.length ? Math.sqrt(f0s.reduce((a,b)=>a+(b-f0Mean)**2,0)/f0s.length) : 30;
+
+  // ── RMS energy & NHR proxy ──
+  let rms = 0;
+  for (let i = 0; i < N; i++) rms += pcmFloat32[i]*pcmFloat32[i];
+  rms = Math.sqrt(rms / N);
+
+  // Zero-crossing rate (breathiness proxy)
+  let zcr = 0;
+  for (let i = 1; i < N; i++) if ((pcmFloat32[i]>=0) !== (pcmFloat32[i-1]>=0)) zcr++;
+  zcr /= N;
+
+  // ── Spectral features via FFT (O(N log N)) ──
+  const fftSize = 1024; // power of 2
+  const midStart = Math.floor(N / 2);
+  const frame = pcmFloat32.subarray(midStart, midStart + fftSize);
+  const mags = fftMagnitudes(frame, fftSize);
+
+  // Spectral centroid (formant_shift proxy)
+  let wsum = 0, msum = 0;
+  for (let k = 0; k < mags.length; k++) { wsum += k*mags[k]; msum += mags[k]; }
+  const centroid = msum > 0 ? wsum/msum : mags.length/4;
+  const centroidNorm = Math.min(centroid / (mags.length/2), 1);
+
+  // Spectral tilt: ratio of low-freq energy to high-freq energy
+  let loE = 0, hiE = 0;
+  const mid = Math.floor(mags.length/4);
+  for (let k = 0; k < mid; k++) loE += mags[k]*mags[k];
+  for (let k = mid; k < mags.length; k++) hiE += mags[k]*mags[k];
+  const tilt = hiE > 0 ? Math.min(loE/(hiE+1e-9), 10)/10 : 0.5;
+
+  // ── Map to voice_vector[10] in [-1, 1] range ──
+  // Convention: 0 = neutral/average, ±1 = extreme
+  const clamp = (v, lo=-1, hi=1) => Math.max(lo, Math.min(hi, v));
+  const norm01 = (v, lo, hi) => clamp((v-lo)/(hi-lo)*2-1);
+
+  const vec = new Float32Array(10);
+  vec[0] = norm01(f0Std, 5, 80);                    // f0_range: narrow→wide pitch variation
+  vec[1] = clamp((zcr - 0.05) * 10);                // breathiness: ZCR proxy
+  vec[2] = clamp((tilt - 0.5) * 4);                 // spectral_tilt: breathy→pressed
+  vec[3] = norm01(centroidNorm, 0.1, 0.6);           // formant_shift: low→high resonance
+  vec[4] = norm01(f0Std / (f0Mean+1e-9), 0.05, 0.4);// formant_agility: stable→expressive
+  vec[5] = clamp((zcr - 0.03) * 15 - 0.5);          // jitter: smoothness
+  vec[6] = 0;                                        // mora_timing: neutral default
+  vec[7] = norm01(rms, 0.01, 0.3);                   // vocal_weight: soft→projected
+  vec[8] = norm01(f0Mean, 80, 280);                  // register: bass→soprano
+  vec[9] = clamp((tilt - 0.7) * 3);                 // age_texture: smooth→rough
+
+  return vec;
+}
+
+// ── WEIGHT SERIALIZATION ───────────────────────────────────────────────────
+function serializeLayers(layers) {
+  // Pack BitLinear layers to { ternary: Base64(Int8), scale: Base64(Float32) }[]
+  return layers.map(l => ({
+    w: btoa(String.fromCharCode(...new Uint8Array(l.weight.buffer))),
+    s: btoa(String.fromCharCode(...new Uint8Array(l.scale.buffer))),
+    r: l.inFeatures,
+    c: l.outFeatures,
+  }));
+}
+
+function deserializeLayers(data, layers) {
+  // Load serialized weights back into existing BitLinear layer instances
+  data.forEach((d, i) => {
+    const wBytes = Uint8Array.from(atob(d.w), c => c.charCodeAt(0));
+    const sBytes = Uint8Array.from(atob(d.s), c => c.charCodeAt(0));
+    layers[i].weight.set(new Int8Array(wBytes.buffer));
+    layers[i].scale.set(new Float32Array(sBytes.buffer));
+  });
+}
+
+function getAllVocoderLayers() {
+  const layers = [];
+  for (const stage of STATE.vocoder.stages) {
+    layers.push(stage.adaln_shift, stage.adaln_scale);
+    for (const rb of stage.resBlocks) {
+      layers.push(rb.W1, rb.W2);
+    }
+  }
+  return layers;
+}
+
+// Get just the AdaLN conditioning layers from the vocoder
+function getVocoderConditioningLayers() {
+  const layers = [];
+  for (const block of STATE.vocoder.stages) {
+    layers.push(block.adaln_shift, block.adaln_scale);
+  }
+  return layers;
+}
+
+// Get all MVC layers for serialization
+function getMVCLayers() {
+  return STATE.mvc.getLinearLayers();
+}
+
+// ── .pop2 EXPORT ──────────────────────────────────────────────────────────
+async function exportPop2() {
+  const name = document.getElementById('pop2-name').value.trim() || 'unnamed';
+
+  LOG.info('Serializing .pop2...');
+  setPopExportStatus('serializing...', 'wrk');
+
+  const mvcLayers = getMVCLayers();
+  const vocCondLayers = getVocoderConditioningLayers();
+  const snakeAlphas = STATE.vocoder.getAllAlphas();
+  const baseHash = await computeBaseModelHash();
+
+  const pop2 = {
+    magic:   'POP2',
+    version: '1.0',
+    name,
+    description: describeVoice(Array.from(STATE.voiceVec)),
+    voice_vector: Array.from(STATE.voiceVec),
+    mvc_weights: serializeLayers(mvcLayers),
+    vocoder_full: serializeLayers(getAllVocoderLayers()),
+    duration_model: serializeLayers(STATE.durModel.getLayers()),
+    snake_alphas: snakeAlphas.map(a => Array.from(a)),
+    base_model_hash: baseHash,
+    sample_meta: STATE.pop2SampleMeta || { duration_s: 0, sample_count: 0 },
+    training_meta: STATE.pop2TrainingMeta || { loss_final: null, epochs: 0, trained_at: new Date().toISOString() },
+  };
+
+  const json = JSON.stringify(pop2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `${name}.pop2`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  document.getElementById('pop2-status').textContent = name + '.pop2';
+  document.getElementById('pop2-status').style.color = 'var(--green)';
+  setPopExportStatus(`exported: ${name}.pop2`, 'ok');
+  LOG.ok(`.pop2 exported: ${name} (mvc: ${mvcLayers.length} layers, voc cond: ${vocCondLayers.length} layers)`);
+}
+
+// ── .pop2 LOAD ────────────────────────────────────────────────────────────
+async function loadPop2(file) {
+  LOG.info(`Loading .pop2: ${file.name}...`);
+  setPopExportStatus('loading...', 'wrk');
+
+  try {
+    const text = await file.text();
+    const pop2 = JSON.parse(text);
+
+    if (pop2.magic !== 'POP2') throw new Error('Not a .pop2 file (magic mismatch)');
+
+    // Hash check
+    const currentHash = await computeBaseModelHash();
+    if (pop2.base_model_hash && pop2.base_model_hash !== currentHash) {
+      LOG.warn('.pop2 base_model_hash mismatch — conditioning may sound off (base model differs)');
+    }
+
+    // Load voice vector
+    STATE.voiceVec = new Float32Array(pop2.voice_vector);
+    syncVoiceSliders();
+
+    // Load MVC weights
+    if (pop2.mvc_weights) {
+      deserializeLayers(pop2.mvc_weights, getMVCLayers());
+      LOG.ok(`MVC weights loaded (${pop2.mvc_weights.length} layers)`);
+    }
+
+    // Load vocoder conditioning or full vocoder
+    if (pop2.vocoder_full) {
+      if (pop2.training_meta && pop2.training_meta.epochs === 0) {
+        LOG.warn("Legacy .pop2 (0 epochs): skipping resBlock weights to preserve timbre");
+        let idx = 0;
+        for (const stage of STATE.vocoder.stages) {
+          deserializeLayers([pop2.vocoder_full[idx++], pop2.vocoder_full[idx++]], [stage.adaln_shift, stage.adaln_scale]);
+          idx += stage.resBlocks.length * 2;
+        }
+      } else {
+        const allVocLayers = getAllVocoderLayers();
+        deserializeLayers(pop2.vocoder_full, allVocLayers);
+        LOG.ok(`Vocoder full weights loaded (${pop2.vocoder_full.length} layers)`);
+      }
+    } else if (pop2.vocoder_conditioning) {
+      // legacy: load only conditioning layers, keep resBlocks as base init
+      const condLayers = getVocoderConditioningLayers();
+      deserializeLayers(pop2.vocoder_conditioning, condLayers);
+      LOG.warn("Legacy .pop2: resBlock weights not present, using base init");
+    }
+
+    // Load duration model
+    if (pop2.duration_model && STATE.durModel) {
+      deserializeLayers(pop2.duration_model, STATE.durModel.getLayers());
+      LOG.ok(`Duration model loaded (${pop2.duration_model.length} layers)`);
+    }
+
+    // Load snake alphas if present
+    if (pop2.snake_alphas) {
+      const alphas = STATE.vocoder.getAllAlphas();
+      pop2.snake_alphas.forEach((a, i) => {
+        if (alphas[i]) alphas[i].set(new Float32Array(a));
+      });
+      LOG.ok(`Snake alphas loaded (${pop2.snake_alphas.length} vectors)`);
+    }
+
+    // Update UI
+    document.getElementById('pop2-status').textContent = pop2.name;
+    document.getElementById('pop2-status').style.color = 'var(--green)';
+    document.getElementById('voice-desc').textContent = pop2.description || describeVoice(Array.from(STATE.voiceVec));
+
+    // Show meta
+    const meta = [];
+    if (pop2.sample_meta?.duration_s) meta.push(`sample: ${pop2.sample_meta.duration_s.toFixed(1)}s`);
+    if (pop2.training_meta?.loss_final) meta.push(`loss: ${pop2.training_meta.loss_final.toFixed(4)}`);
+    if (pop2.training_meta?.epochs) meta.push(`epochs: ${pop2.training_meta.epochs}`);
+    document.getElementById('pop2-meta-display').textContent = meta.join(' · ');
+
+    setPopExportStatus(`loaded: ${pop2.name}`, 'ok');
+    document.getElementById('pop2-name').value = pop2.name;
+    LOG.ok(`.pop2 loaded: "${pop2.name}" — ${pop2.description || ''}`);
+
+  } catch(e) {
+    LOG.err(`.pop2 load failed: ${e.message}`);
+    setPopExportStatus('load failed: ' + e.message, 'err');
+  }
+}
+
+// Sync voice sliders to STATE.voiceVec after .pop2 load
+function syncVoiceSliders() {
+  const sliders = document.querySelectorAll('.axis-slider');
+  sliders.forEach((sl, i) => {
+    if (i < STATE.voiceVec.length) {
+      sl.value = Math.round(STATE.voiceVec[i] * 100);
+      const valSpan = document.getElementById(`axv-${i}`);
+      if (valSpan) valSpan.textContent = STATE.voiceVec[i].toFixed(2);
+    }
+  });
+}
+
+// ── RECORDING PIPELINE ────────────────────────────────────────────────────
+const REC = {
+  stream:      null,
+  mediaRec:    null,
+  chunks:      [],
+  pcm:         null,  // Float32Array — decoded recording
+  analyzing:   false,
+  training:    false,
+  levelTimer:  null,
+  analyzerNode: null,
+  levelBuf:    null,
+};
+
+function setRecStatus(msg, cls='') {
+  const el = document.getElementById('rec-status');
+  el.textContent = msg;
+  el.className = 'pop-status' + (cls ? ' ' + cls : '');
+}
+function setAnalyzeStatus(msg, cls='') {
+  const el = document.getElementById('analyze-status');
+  el.textContent = msg;
+  el.className = 'pop-status' + (cls ? ' ' + cls : '');
+}
+function setPopExportStatus(msg, cls='') {
+  const el = document.getElementById('pop2-export-status');
+  el.textContent = msg;
+  el.className = 'pop-status' + (cls ? ' ' + cls : '');
+}
+
+async function startRecording() {
+  try {
+    REC.stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 24000, channelCount: 1 }, video: false });
+    REC.chunks = [];
+    REC.pcm = null;
+
+    REC.mediaRec = new MediaRecorder(REC.stream);
+    REC.mediaRec.ondataavailable = e => { if (e.data.size > 0) REC.chunks.push(e.data); };
+    REC.mediaRec.onstop = onRecordingStop;
+    REC.mediaRec.start(100);
+
+    // Level meter via AnalyserNode
+    const audioCtx = getAudioCtx();
+    const src = audioCtx.createMediaStreamSource(REC.stream);
+    REC.analyzerNode = audioCtx.createAnalyser();
+    REC.analyzerNode.fftSize = 256;
+    REC.levelBuf = new Uint8Array(REC.analyzerNode.frequencyBinCount);
+    src.connect(REC.analyzerNode);
+    REC.levelTimer = setInterval(updateRecLevel, 60);
+
+    document.getElementById('btn-rec-start').disabled = true;
+    document.getElementById('btn-rec-stop').disabled = false;
+    document.getElementById('btn-rec-clear').disabled = false;
+    document.getElementById('btn-analyze').disabled = true;
+    setRecStatus('recording... (speak naturally for 10–30s)', 'wrk');
+    LOG.info('Recording started — mic active');
+
+  } catch(e) {
+    setRecStatus('mic access denied: ' + e.message, 'err');
+    LOG.err('getUserMedia failed: ' + e.message);
+  }
+}
+
+function updateRecLevel() {
+  if (!REC.analyzerNode || !REC.levelBuf) return;
+  REC.analyzerNode.getByteFrequencyData(REC.levelBuf);
+  let avg = 0;
+  for (const v of REC.levelBuf) avg += v;
+  avg /= REC.levelBuf.length;
+  const pct = Math.min(100, (avg / 128) * 100);
+  document.getElementById('rec-level-fill').style.width = pct + '%';
+  drawRecWaveform();
+}
+
+function drawRecWaveform() {
+  const canvas = document.getElementById('rec-canvas');
+  const ctx2 = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx2.fillStyle = '#131920';
+  ctx2.fillRect(0, 0, W, H);
+  if (!REC.analyzerNode || !REC.levelBuf) return;
+  const timeBuf = new Uint8Array(REC.analyzerNode.fftSize);
+  REC.analyzerNode.getByteTimeDomainData(timeBuf);
+  ctx2.strokeStyle = '#00d4ff';
+  ctx2.lineWidth = 1;
+  ctx2.beginPath();
+  for (let i = 0; i < timeBuf.length; i++) {
+    const x = i / timeBuf.length * W;
+    const y = (timeBuf[i] / 128 - 1) * (H/2) + H/2;
+    i === 0 ? ctx2.moveTo(x, y) : ctx2.lineTo(x, y);
+  }
+  ctx2.stroke();
+}
+
+function stopRecording() {
+  if (REC.mediaRec && REC.mediaRec.state !== 'inactive') REC.mediaRec.stop();
+  if (REC.stream) REC.stream.getTracks().forEach(t => t.stop());
+  clearInterval(REC.levelTimer);
+  document.getElementById('rec-level-fill').style.width = '0%';
+  document.getElementById('btn-rec-start').disabled = false;
+  document.getElementById('btn-rec-stop').disabled = true;
+  setRecStatus('processing recording...', 'wrk');
+  LOG.info('Recording stopped — decoding...');
+}
+
+async function onRecordingStop() {
+  const blob = new Blob(REC.chunks, { type: 'audio/webm' });
+  const arrayBuf = await blob.arrayBuffer();
+
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+    const decoded  = await audioCtx.decodeAudioData(arrayBuf);
+    // Mix to mono
+    const mono = new Float32Array(decoded.length);
+    for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
+      const chanData = decoded.getChannelData(ch);
+      for (let i = 0; i < decoded.length; i++) mono[i] += chanData[i];
+    }
+    for (let i = 0; i < mono.length; i++) mono[i] /= decoded.numberOfChannels;
+    REC.pcm = mono;
+
+    const dur = (mono.length / 24000).toFixed(1);
+    setRecStatus(`recorded ${dur}s — ready to analyze`, 'ok');
+    LOG.ok(`Recording decoded: ${dur}s @ 24kHz (${mono.length.toLocaleString()} samples)`);
+    document.getElementById('btn-analyze').disabled = false;
+
+    // Draw static waveform
+    const canvas = document.getElementById('rec-canvas');
+    const ctx2 = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx2.fillStyle = '#131920'; ctx2.fillRect(0, 0, W, H);
+    ctx2.strokeStyle = '#22c55e'; ctx2.lineWidth = 1; ctx2.beginPath();
+    const step = Math.max(1, Math.floor(mono.length / W));
+    for (let x = 0; x < W; x++) {
+      const i = x * step;
+      const y = (mono[i] || 0) * (H/2) * 0.9 + H/2;
+      x === 0 ? ctx2.moveTo(x, y) : ctx2.lineTo(x, y);
+    }
+    ctx2.stroke();
+
+    STATE.pop2SampleMeta = { duration_s: parseFloat(dur), sample_count: 1, analysis: {} };
+
+  } catch(e) {
+    setRecStatus('decode failed: ' + e.message, 'err');
+    LOG.err('Audio decode failed: ' + e.message);
+  }
+}
+
+function clearRecording() {
+  REC.pcm = null;
+  REC.chunks = [];
+  const canvas = document.getElementById('rec-canvas');
+  const ctx2 = canvas.getContext('2d');
+  ctx2.fillStyle = '#131920';
+  ctx2.fillRect(0, 0, canvas.width, canvas.height);
+  setRecStatus('cleared — ready to record', '');
+  setAnalyzeStatus('waiting for recording...', '');
+  document.getElementById('btn-analyze').disabled = true;
+  document.getElementById('btn-train').style.display = 'none';
+  document.getElementById('btn-export-pop2').disabled = true;
+  document.getElementById('train-progress-wrap').style.display = 'none';
+  setPopExportStatus('no voice trained yet', '');
+  LOG.info('Recording cleared');
+}
+
+// ── VOICE ANALYSIS ────────────────────────────────────────────────────────
+function runAnalysis() {
+  if (!REC.pcm) { setAnalyzeStatus('no recording', 'err'); return; }
+  setAnalyzeStatus('analyzing...', 'wrk');
+  LOG.info('Analyzing voice recording...');
+
+  // Run analysis (synchronous — fast)
+  const vec = analyzeVoiceRecording(REC.pcm, 24000);
+  STATE.voiceVec = vec;
+  syncVoiceSliders();
+  document.getElementById('voice-desc').textContent = describeVoice(Array.from(vec));
+
+  const f0Est = 24000 / Math.max(1, 256); // rough proxy
+  STATE.pop2SampleMeta = Object.assign(STATE.pop2SampleMeta || {}, {
+    analysis: {
+      f0_mean:         vec[8] * 100 + 170,  // approx from register dim
+      f0_std:          vec[0] * 37 + 42,
+      nhr:             vec[1],
+      formant_centroid: vec[3],
+    }
+  });
+
+  setAnalyzeStatus(`analyzed — vec: [${Array.from(vec).map(v=>v.toFixed(2)).join(', ')}]`, 'ok');
+  LOG.ok(`Voice vector: register=${vec[8].toFixed(2)}, breathiness=${vec[1].toFixed(2)}, tilt=${vec[2].toFixed(2)}`);
+
+  // Show train button
+  document.getElementById('btn-train').style.display = '';
+  document.getElementById('btn-train').disabled = false;
+  document.getElementById('spoken-text').disabled = false;
+  document.getElementById('train-progress-wrap').style.display = 'flex';
+  LOG.dim('Ready to train conditioning layers — click TRAIN CONDITIONING');
+}
+
+// ── CONDITIONING LAYER TRAINING ───────────────────────────────────────────
+// Trains only: MVC AdaLN layers + vocoder AdaLN conditioning layers + snake α
+// Base vocoder and MVC backbone stay frozen.
+// Loss: mel MSE between predicted mel and mel computed from actual recording.
+
+function computeRecordingMel(pcm, nFrames) {
+  if (!MEL_FILTERS) buildMelFilters();
+  const mels = new Float32Array(nFrames * CFG.n_mels);
+  for (let f = 0; f < nFrames; f++) {
+    const start = f * CFG.hop;
+    const frame = pcm.subarray(start, Math.min(start + CFG.n_fft, pcm.length));
+    const mags  = fftMagnitudes(frame, CFG.n_fft);
+    for (let m = 0; m < CFG.n_mels; m++) {
+      let energy = 0;
+      if (MEL_FILTERS) {
+        for (let k = 0; k < mags.length; k++) energy += mags[k] * (MEL_FILTERS[m * mags.length + k] || 0);
+      } else {
+        const lo = Math.floor(m * mags.length / CFG.n_mels);
+        const hi = Math.floor((m+1) * mags.length / CFG.n_mels);
+        for (let k = lo; k < hi; k++) energy += mags[k];
+      }
+      mels[f * CFG.n_mels + m] = Math.log(Math.max(energy, 1e-6));
+    }
+  }
+  return mels;
+}
+
+async function trainConditioning() {
+  if (STATE.playing) {
+    LOG.warn("Synthesis in progress – stop playback before training.");
+    return;
+  }
+  if (!REC.pcm || REC.training) return;
+  
+  const spokenText = document.getElementById('spoken-text').value.trim();
+  if (!spokenText) {
+    LOG.err("Please enter the text you spoke in the recording before training.");
+    document.getElementById('train-status').textContent = "error: missing spoken text";
+    REC.training = false;
+    return;
+  }
+  
+  STATE.trainSession++;
+  const myTrainSession = STATE.trainSession;
+  
+  REC.training = true;
+  document.getElementById('btn-train').disabled = true;
+  document.getElementById('btn-analyze').disabled = true;
+  document.getElementById('spoken-text').disabled = true;
+
+  const EPOCHS = 60;
+  const LR     = 0.004;
+  const LR_MIN = 0.0003;
+
+  const nFrames = Math.min(64, Math.floor((REC.pcm.length - CFG.n_fft) / CFG.hop));
+  if (nFrames < 4) {
+    setAnalyzeStatus('recording too short for training', 'err');
+    REC.training = false;
+    document.getElementById('btn-train').disabled = false;
+    return;
+  }
+
+  LOG.info(`Computing target mel from recording (${nFrames} frames)...`);
+  const targetMel = computeRecordingMel(REC.pcm, nFrames);
+
+  const adalnLayers = [
+    ...STATE.mvc.adaln_shift, ...STATE.mvc.adaln_scale,
+    ...getVocoderConditioningLayers(),
+    ...STATE.durModel.getLayers(),
+  ];
+  const snakeAlphas = STATE.vocoder.getAllAlphas();
+
+  const mAd = adalnLayers.map(l => ({ mS: new Float32Array(l.scale.length) }));
+  const vAd = adalnLayers.map(l => ({ vS: new Float32Array(l.scale.length) }));
+  const mAl = snakeAlphas.map(a => new Float32Array(a.length));
+  const vAl = snakeAlphas.map(a => new Float32Array(a.length));
+
+  const b1 = 0.9, b2 = 0.999, eps = 1e-8;
+  let adamStep = 0;
+
+  const targetVoiceVec = new Float32Array(STATE.voiceVec);
+
+  const lang = document.getElementById('lang-sel').value;
+  const g2pFn = G2P[lang] || G2P.en;
+  const spokenPhonemes = g2pFn(spokenText);
+  const basePhonemes = spokenPhonemes.map(p => PHONEMES[p] ? PHONEMES[p].idx : 0);
+
+  let trainPhonemes = [];
+  while (trainPhonemes.length < nFrames) {
+    trainPhonemes = trainPhonemes.concat(basePhonemes);
+  }
+  trainPhonemes = trainPhonemes.slice(0, nFrames);
+
+  LOG.ok(`Using ${trainPhonemes.length} phonemes from spoken text: "${spokenText}"`);
+
+  // Reduce epochs on mobile — each epoch has a full MVC forward
+  const ACTUAL_EPOCHS = IS_MOBILE ? 20 : EPOCHS;
+  LOG.info(`Training: ${ACTUAL_EPOCHS} epochs · ${adalnLayers.length} adaln layers · ${snakeAlphas.length} alpha vecs${IS_MOBILE ? ' [mobile-reduced]' : ''}`);
+  document.getElementById('train-progress-wrap').style.display = 'flex';
+  document.getElementById('train-status').textContent = 'starting...';
+
+  let lastLoss = 0;
+
+  for (let epoch = 0; epoch < ACTUAL_EPOCHS; epoch++) {
+    const lr = LR_MIN + 0.5 * (LR - LR_MIN) * (1 + Math.cos(Math.PI * epoch / ACTUAL_EPOCHS));
+
+    // Yield every epoch on mobile so UI stays alive
+    if (IS_MOBILE) {
+      await yieldToMain();
+      const pct = Math.round(epoch / ACTUAL_EPOCHS * 100);
+      document.getElementById('train-fill').style.width = pct + '%';
+      document.getElementById('train-epoch-label').textContent = `epoch ${epoch+1} / ${ACTUAL_EPOCHS}`;
+      document.getElementById('train-status').textContent = `epoch ${epoch+1} · loss: ${lastLoss.toFixed(5)}`;
+    }
+
+    if (STATE.trainSession !== myTrainSession) {
+      LOG.warn("Training cancelled by new session");
+      return;
+    }
+
+    // Forward: use async chunked path on mobile
+    const predMel = IS_MOBILE
+      ? await mvcForwardAsync(trainPhonemes, nFrames, targetVoiceVec, myTrainSession, false)
+      : STATE.mvc.forward(trainPhonemes, nFrames, targetVoiceVec);
+    if (!predMel) return; // cancelled
+
+    // Normalise targetMel to same tanh range as predMel
+    let melMin = Infinity, melMax = -Infinity;
+    for (let i = 0; i < targetMel.length; i++) {
+      if (targetMel[i] < melMin) melMin = targetMel[i];
+      if (targetMel[i] > melMax) melMax = targetMel[i];
+    }
+    const melRange = melMax - melMin || 1;
+    const targetNormalised = new Float32Array(targetMel.length);
+    for (let i = 0; i < targetMel.length; i++) {
+      targetNormalised[i] = Math.tanh(2 * (targetMel[i] - melMin) / melRange - 1);
+    }
+
+    // Mel MSE loss against recording-derived target
+    let loss = 0;
+    const melGrad = new Float32Array(predMel.length);
+    const len = Math.min(predMel.length, targetNormalised.length);
+    for (let i = 0; i < len; i++) {
+      const diff = predMel[i] - targetNormalised[i];
+      loss += diff * diff;
+      melGrad[i] = 2 * diff / len;
+    }
+    loss /= len;
+    lastLoss = loss;
+
+    adamStep++;
+    const bc1 = 1 - Math.pow(b1, adamStep);
+    const bc2 = 1 - Math.pow(b2, adamStep);
+
+    // Update AdaLN scale weights via approximate gradient
+    adalnLayers.forEach((layer, li) => {
+      for (let j = 0; j < layer.scale.length; j++) {
+        const vIdx = j % targetVoiceVec.length;
+        const g = melGrad[j % melGrad.length] * targetVoiceVec[vIdx] * 0.1;
+        mAd[li].mS[j] = b1 * mAd[li].mS[j] + (1-b1) * g;
+        vAd[li].vS[j] = b2 * vAd[li].vS[j] + (1-b2) * g * g;
+        const mH = mAd[li].mS[j] / bc1;
+        const vH = vAd[li].vS[j] / bc2;
+        layer.scale[j] -= lr * mH / (Math.sqrt(vH) + eps);
+        layer.scale[j]  = Math.max(-2, Math.min(2, layer.scale[j]));
+      }
+      // Ternary weights: gradient-guided re-quantization
+      for (let j = 0; j < layer.weight.length; j++) {
+        const g = melGrad[j % melGrad.length] * 0.3;
+        if (Math.abs(g) > 0.15) {
+          const t = -Math.sign(g);
+          if (layer.weight[j] !== t) { layer.weight[j] = t; layer.dirty = true; }
+        }
+      }
+    });
+
+    // Update snake alphas
+    snakeAlphas.forEach((alpha, ai) => {
+      for (let j = 0; j < alpha.length; j++) {
+        const g = loss * (Math.random() - 0.5) * 0.02;
+        mAl[ai][j] = b1 * mAl[ai][j] + (1-b1) * g;
+        vAl[ai][j] = b2 * vAl[ai][j] + (1-b2) * g * g;
+        const mH = mAl[ai][j] / bc1;
+        const vH = vAl[ai][j] / bc2;
+        alpha[j] -= lr * mH / (Math.sqrt(vH) + eps);
+        alpha[j]  = Math.max(0.1, Math.min(5.0, alpha[j]));
+      }
+    });
+
+    if (epoch % 6 === 0 || epoch === ACTUAL_EPOCHS - 1) {
+      const pct = Math.round((epoch + 1) / ACTUAL_EPOCHS * 100);
+      document.getElementById('train-fill').style.width = pct + '%';
+      document.getElementById('train-epoch-label').textContent = `epoch ${epoch+1} / ${ACTUAL_EPOCHS}`;
+      document.getElementById('train-status').textContent = `mel MSE: ${loss.toFixed(5)} · lr: ${lr.toFixed(5)}`;
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  STATE.pop2TrainingMeta = {
+    loss_final:     lastLoss,
+    epochs:         ACTUAL_EPOCHS,
+    trained_at:     new Date().toISOString(),
+    brymar_version: null,
+  };
+
+  document.getElementById('train-fill').style.width = '100%';
+  document.getElementById('train-fill').className = 'pop-meter-fill green';
+  document.getElementById('train-status').textContent = `complete — mel MSE: ${lastLoss.toFixed(5)} (${ACTUAL_EPOCHS} epochs)`;
+  document.getElementById('btn-export-pop2').disabled = false;
+  setPopExportStatus('ready to export', 'ok');
+  REC.training = false;
+  LOG.ok(`Conditioning training complete — ${ACTUAL_EPOCHS} epochs, mel MSE: ${lastLoss.toFixed(5)}`);
+  LOG.dim('Export .pop2 to save this voice identity');
+}
+
+
+// ── PHASE 6: TAB SYSTEM ──────────────────────────────────────────────────
+function initTabs() {
+  const tabs = document.querySelectorAll('.rp-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.tab;
+      tabs.forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.rp-pane').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      const pane = document.getElementById('pane-' + target);
+      if (pane) pane.classList.add('active');
+    });
+  });
+}
+
+// ── PHASE 6: PLAYBACK CURSOR ─────────────────────────────────────────────
+// Animates a cursor line across the wave canvas during playback.
+// Clicking the wave canvas scrubs to that position.
+const CURSOR = {
+  active:    false,
+  startTime: 0,
+  duration:  0,
+  raf:       null,
+};
+
+function initPlaybackCursor() {
+  const canvas = document.getElementById('wave-canvas');
+  if (!canvas) return;
+
+  // Wrap canvas in a relative-position container for the cursor overlay
+  const wrap = document.createElement('div');
+  wrap.className = 'wave-wrap';
+  wrap.style.cssText = 'position:relative;width:100%;';
+  canvas.parentNode.insertBefore(wrap, canvas);
+  wrap.appendChild(canvas);
+
+  const cursor = document.createElement('div');
+  cursor.id = 'wave-cursor';
+  wrap.appendChild(cursor);
+
+  // Click to seek — store position for next playback
+  canvas.addEventListener('click', e => {
+    if (!STATE.lastPCM) return;
+    const rect = canvas.getBoundingClientRect();
+    const frac = (e.clientX - rect.left) / rect.width;
+    LOG.info(`Waveform seek: ${(frac * 100).toFixed(0)}% — replaying from position`);
+    const offset = Math.floor(frac * STATE.lastPCM.length);
+    const trimmed = STATE.lastPCM.slice(offset);
+    playPCM(trimmed, CFG.sr);
+    startCursorAnimation(trimmed.length / CFG.sr, frac);
+  });
+}
+
+function startCursorAnimation(durationSec, startFrac = 0) {
+  const cursor = document.getElementById('wave-cursor');
+  const canvas = document.getElementById('wave-canvas');
+  if (!cursor || !canvas) return;
+
+  stopCursorAnimation();
+  CURSOR.active    = true;
+  CURSOR.startTime = performance.now();
+  CURSOR.duration  = durationSec * 1000;
+  CURSOR.startFrac = startFrac;
+
+  cursor.style.display = 'block';
+
+  function tick(now) {
+    const elapsed = now - CURSOR.startTime;
+    const frac    = CURSOR.startFrac + (1 - CURSOR.startFrac) * Math.min(elapsed / CURSOR.duration, 1);
+    const W       = canvas.getBoundingClientRect().width || canvas.width;
+    cursor.style.left = (frac * W) + 'px';
+
+    if (elapsed < CURSOR.duration) {
+      CURSOR.raf = requestAnimationFrame(tick);
+    } else {
+      cursor.style.display = 'none';
+      CURSOR.active = false;
+    }
+  }
+  CURSOR.raf = requestAnimationFrame(tick);
+}
+
+// Patch playPCM to start cursor animation automatically
+const _origPlayPCM = playPCM;
+window.playPCM = async function(pcm, sr) {
+  startCursorAnimation(pcm.length / sr, 0);
+  return _origPlayPCM(pcm, sr);
+};
+
+// ── PHASE 6: MEL CANVAS ZOOM ─────────────────────────────────────────────
+const MEL_ZOOM = { level: 1, min: 1, max: 4, step: 1 };
+
+function initMelZoom() {
+  const melSection = document.getElementById('mel-canvas')?.parentElement;
+  if (!melSection) return;
+
+  // Build zoom controls row
+  const controls = document.createElement('div');
+  controls.className = 'mel-controls';
+  controls.innerHTML = `
+    <span style="letter-spacing:0.1em;">MEL ZOOM</span>
+    <button id="mel-zoom-out">−</button>
+    <span id="mel-zoom-label">1×</span>
+    <button id="mel-zoom-in">+</button>
+    <span style="flex:1"></span>
+    <span id="mel-frame-count" style="color:var(--dim);"></span>
+  `;
+  melSection.insertBefore(controls, document.getElementById('mel-canvas'));
+
+  document.getElementById('mel-zoom-in').addEventListener('click', () => {
+    if (MEL_ZOOM.level < MEL_ZOOM.max) {
+      MEL_ZOOM.level += MEL_ZOOM.step;
+      updateMelZoom();
+    }
+  });
+  document.getElementById('mel-zoom-out').addEventListener('click', () => {
+    if (MEL_ZOOM.level > MEL_ZOOM.min) {
+      MEL_ZOOM.level -= MEL_ZOOM.step;
+      updateMelZoom();
+    }
+  });
+}
+
+function updateMelZoom() {
+  const label = document.getElementById('mel-zoom-label');
+  if (label) label.textContent = MEL_ZOOM.level + '×';
+  // Redraw mel with zoom if we have data
+  if (STATE.lastMel) {
+    drawMelCanvasZoomed(STATE.lastMel, STATE.lastMelFrames || 0, CFG.n_mels);
+  }
+}
+
+function drawMelCanvasZoomed(mel, nFrames, nMels) {
+  const canvas = document.getElementById('mel-canvas');
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width  = Math.floor(rect.width) || 800;
+  canvas.height = 80;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  ctx.fillStyle = '#06080c';
+  ctx.fillRect(0, 0, W, H);
+  if (!mel || nFrames === 0) return;
+
+  // Zoom: show central slice when zoomed in
+  const zoom       = MEL_ZOOM.level;
+  const visFrames  = Math.max(1, Math.floor(nFrames / zoom));
+  const frameStart = Math.floor((nFrames - visFrames) / 2);
+
+  // Find mel range for normalization
+  let minV = Infinity, maxV = -Infinity;
+  for (let f = frameStart; f < frameStart + visFrames; f++) {
+    for (let m = 0; m < nMels; m++) {
+      const v = mel[f * nMels + m];
+      if (v < minV) minV = v;
+      if (v > maxV) maxV = v;
+    }
+  }
+  const range = maxV - minV + 1e-6;
+
+  const fw = W / visFrames;
+  const bh = H / nMels;
+
+  for (let f = 0; f < visFrames; f++) {
+    for (let m = 0; m < nMels; m++) {
+      const v   = mel[(frameStart + f) * nMels + m];
+      const t   = (v - minV) / range;
+      const r   = Math.floor(t * 60);
+      const g   = Math.floor(t * 180);
+      const b   = Math.floor(100 + t * 155);
+      const x   = Math.floor(f * fw);
+      const y   = H - Math.floor((m + 1) * bh);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, Math.ceil(fw) + 1, Math.ceil(bh) + 1);
+    }
+  }
+
+  // Frame count display
+  const fc = document.getElementById('mel-frame-count');
+  if (fc) fc.textContent = `${visFrames}/${nFrames} frames`;
+}
+
+// Patch drawMelCanvas to store data and use zoom-aware version
+const _origDrawMelCanvas = drawMelCanvas;
+window.drawMelCanvas = function(mel, nFrames, nMels) {
+  STATE.lastMel       = mel;
+  STATE.lastMelFrames = nFrames;
+  drawMelCanvasZoomed(mel, nFrames, nMels);
+};
+
+// ── POP STUDIO INIT ───────────────────────────────────────────────────────
+function initPopStudio() {
+
+  document.getElementById('btn-rec-start').addEventListener('click', startRecording);
+  document.getElementById('btn-rec-stop').addEventListener('click', stopRecording);
+  document.getElementById('btn-rec-clear').addEventListener('click', clearRecording);
+  document.getElementById('btn-analyze').addEventListener('click', runAnalysis);
+  document.getElementById('btn-train').addEventListener('click', trainConditioning);
+  document.getElementById('btn-export-pop2').addEventListener('click', exportPop2);
+
+  document.getElementById('btn-load-pop2').addEventListener('click', () => {
+    document.getElementById('pop2-file-in').click();
+  });
+  document.getElementById('pop2-file-in').addEventListener('change', e => {
+    if (e.target.files[0]) loadPop2(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  // Draw empty waveform canvas
+  const canvas = document.getElementById('rec-canvas');
+  const ctx2 = canvas.getContext('2d');
+  ctx2.fillStyle = '#131920';
+  ctx2.fillRect(0, 0, canvas.width, canvas.height);
+  ctx2.strokeStyle = '#1e2d42';
+  ctx2.lineWidth = 1;
+  ctx2.beginPath();
+  ctx2.moveTo(0, canvas.height/2);
+  ctx2.lineTo(canvas.width, canvas.height/2);
+  ctx2.stroke();
+
+  LOG.ok('Pop Studio ready — record a voice sample to create a .pop2 identity');
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

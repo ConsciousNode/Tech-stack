@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UniNCoder — Forensic Unicode Analyzer</title>
+
+<style>
+  :root {
+    --bg:        #F7F4EF;
+    --bg-panel:  #E8F4F0;
+    --bg-input:  #FFFFFF;
+    --text:      #1A2E3B;
+    --text-muted:#4A6370;
+    --blue:      #2D7DD2;
+    --blue-light:#D6EAFB;
+    --coral:     #FF6B6B;
+    --coral-light:#FFE5E5;
+    --amber:     #D4860A;
+    --amber-light:#FFF3CD;
+    --green:     #2E8B57;
+    --green-light:#D4EDDA;
+    --purple:    #7B4FCF;
+    --purple-light:#EDE4FF;
+    --border:    #C8D8E0;
+    --mono: ui-monospace, 'Cascadia Code', 'Cascadia Mono', 'Consolas', 'Menlo', 'Monaco', 'Liberation Mono', 'Courier New', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--mono);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--text);
+    color: var(--bg);
+    padding: 14px 28px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 3px solid var(--blue);
+  }
+  header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #fff;
+  }
+  header .sub {
+    font-size: 11px;
+    font-weight: 300;
+    color: #8BAAB8;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  header .badge {
+    margin-left: auto;
+    font-size: 10px;
+    color: #8BAAB8;
+    letter-spacing: 0.1em;
+  }
+
+  /* ── LAYOUT ── */
+  .shell {
+    display: grid;
+    grid-template-columns: 1fr 220px;
+    grid-template-rows: auto 1fr auto;
+    gap: 0;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px 20px 40px;
+    min-height: calc(100vh - 55px);
+  }
+
+  /* ── INPUT ZONE ── */
+  .input-zone {
+    grid-column: 1 / -1;
+    background: var(--bg-input);
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .input-tabs {
+    display: flex;
+    border-bottom: 1.5px solid var(--border);
+    background: var(--bg);
+  }
+  .tab-btn {
+    padding: 8px 18px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: none;
+    border: none;
+    border-right: 1px solid var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tab-btn.active {
+    background: var(--blue);
+    color: #fff;
+  }
+  .tab-btn:hover:not(.active) { background: var(--blue-light); }
+
+  .input-panel { display: none; padding: 14px; }
+  .input-panel.active { display: block; }
+
+  textarea {
+    width: 100%;
+    height: 130px;
+    font-family: var(--mono);
+    font-size: 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    padding: 10px;
+    background: var(--bg);
+    color: var(--text);
+    resize: vertical;
+    outline: none;
+  }
+  textarea:focus { border-color: var(--blue); }
+
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 6px;
+    padding: 32px;
+    text-align: center;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .drop-zone.over { border-color: var(--blue); background: var(--blue-light); }
+  .drop-zone input[type=file] { display: none; }
+  .drop-zone .drop-icon { font-size: 28px; margin-bottom: 8px; }
+  .drop-zone p { font-size: 12px; }
+  .drop-zone span { color: var(--blue); cursor: pointer; text-decoration: underline; }
+
+  .controls-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-secondary { background: var(--bg-panel); color: var(--text); border: 1.5px solid var(--border); }
+  .btn-secondary:hover { background: var(--border); }
+  .btn-danger { background: var(--coral); color: #fff; }
+  .btn-danger:hover { opacity: 0.88; }
+
+  .filename-display {
+    font-size: 11px;
+    color: var(--text-muted);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── MAIN VIEW ── */
+  .main-view {
+    grid-column: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-right: 16px;
+  }
+
+  .panel {
+    background: var(--bg-input);
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .panel-count {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  /* ── ANNOTATED VIEW ── */
+  .annotated-body {
+    padding: 14px;
+    min-height: 120px;
+    font-size: 12px;
+    line-height: 2.0;
+    word-break: break-all;
+    white-space: pre-wrap;
+    color: var(--text);
+    max-height: 340px;
+    overflow-y: auto;
+  }
+  .annotated-body.empty {
+    color: var(--text-muted);
+    font-style: italic;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+  }
+
+  .flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: help;
+    position: relative;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .flag-zwsp  { background: var(--coral-light);  color: var(--coral);  border: 1px solid #FFB3B3; }
+  .flag-rtl   { background: var(--amber-light);  color: var(--amber);  border: 1px solid #F0C040; }
+  .flag-homo  { background: var(--purple-light); color: var(--purple); border: 1px solid #C9A8F5; }
+  .flag-b64   { background: var(--blue-light);   color: var(--blue);   border: 1px solid #A0C8F0; }
+  .flag-ctrl  { background: var(--coral-light);  color: var(--coral);  border: 1px solid #FFB3B3; }
+  .flag-other { background: var(--bg-panel);     color: var(--text-muted); border: 1px solid var(--border); }
+
+  .flag .codepoint { font-size: 9px; opacity: 0.75; }
+
+  /* tooltip */
+  .flag[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: calc(100% + 5px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: #fff;
+    padding: 5px 9px;
+    border-radius: 4px;
+    font-size: 10px;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+    max-width: 280px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* ── FINDINGS TABLE ── */
+  .findings-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  .findings-table th {
+    text-align: left;
+    padding: 6px 12px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+  }
+  .findings-table td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--bg-panel);
+    vertical-align: top;
+    color: var(--text);
+  }
+  .findings-table tr:last-child td { border-bottom: none; }
+  .findings-table tr:hover td { background: var(--bg-panel); }
+  .findings-scroll { max-height: 240px; overflow-y: auto; }
+
+  td.col-pos  { color: var(--blue); font-weight: 500; white-space: nowrap; }
+  td.col-char { font-size: 13px; }
+  td.col-cp   { color: var(--text-muted); font-size: 10px; }
+  td.col-ctx  { color: var(--text-muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .no-findings {
+    padding: 20px 14px;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 12px;
+  }
+
+  /* ── DIFF VIEW ── */
+  .diff-body {
+    padding: 14px;
+    font-size: 12px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 240px;
+    overflow-y: auto;
+    color: var(--text);
+  }
+  .diff-add { background: #D4EDDA; color: #155724; border-radius: 2px; }
+  .diff-del { background: var(--coral-light); color: #721c24; text-decoration: line-through; border-radius: 2px; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    grid-column: 2;
+    grid-row: 2 / 4;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 0;
+  }
+
+  .side-panel {
+    background: var(--bg-input);
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .side-panel .panel-header { padding: 7px 12px; }
+
+  .legend { padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text);
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .legend-dot.zwsp  { background: var(--coral); }
+  .legend-dot.rtl   { background: var(--amber); }
+  .legend-dot.homo  { background: var(--purple); }
+  .legend-dot.b64   { background: var(--blue); }
+  .legend-dot.ctrl  { background: #E06060; }
+  .legend-dot.other { background: #9BA8B0; }
+
+  .summary-stats { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--bg-panel);
+    padding-bottom: 4px;
+  }
+  .stat-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .stat-row .stat-val {
+    font-weight: 600;
+    color: var(--text);
+  }
+  .stat-row .stat-val.alert { color: var(--coral); }
+
+  /* strip controls */
+  .strip-controls { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .strip-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+  .check-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .check-row input[type=checkbox] { accent-color: var(--blue); }
+  .strip-btn-row { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+
+  /* report */
+  .report-area {
+    padding: 10px 12px;
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.7;
+    min-height: 60px;
+    white-space: pre-wrap;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--blue); }
+
+  /* status bar */
+  .status-bar {
+    grid-column: 1 / -1;
+    padding: 6px 0 0;
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    display: flex;
+    gap: 18px;
+  }
+  .status-ok  { color: var(--green); }
+  .status-warn { color: var(--amber); }
+  .status-err  { color: var(--coral); }
+
+  /* ── MOBILE ── */
+  @media (max-width: 700px) {
+    body { font-size: 14px; }
+
+    header {
+      padding: 12px 14px;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    header h1 { font-size: 16px; }
+    header .badge {
+      margin-left: 0;
+      width: 100%;
+      font-size: 9px;
+    }
+
+    .shell {
+      grid-template-columns: 1fr;
+      padding: 12px 12px 32px;
+      gap: 0;
+    }
+
+    .main-view {
+      grid-column: 1;
+      padding-right: 0;
+    }
+
+    .sidebar {
+      grid-column: 1;
+      grid-row: auto;
+      padding-top: 0;
+      /* Stack sidebar panels horizontally where possible */
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* Legend and stats side by side, strip and report full width */
+    .side-panel:nth-child(3),
+    .side-panel:nth-child(4) {
+      grid-column: 1 / -1;
+    }
+
+    /* Bigger touch targets */
+    .btn {
+      padding: 11px 16px;
+      font-size: 12px;
+    }
+    .tab-btn {
+      padding: 11px 16px;
+      font-size: 12px;
+      flex: 1;
+      text-align: center;
+    }
+    .check-row {
+      padding: 4px 0;
+      font-size: 13px;
+      gap: 10px;
+    }
+    .check-row input[type=checkbox] {
+      width: 18px;
+      height: 18px;
+    }
+
+    textarea { height: 110px; font-size: 13px; }
+
+    .annotated-body { font-size: 13px; max-height: 260px; }
+    .findings-scroll { max-height: 200px; }
+    .diff-body { max-height: 200px; }
+
+    .findings-table th,
+    .findings-table td { padding: 7px 8px; }
+
+    /* Hide context column on small screens */
+    .findings-table th:last-child,
+    .findings-table td:last-child { display: none; }
+
+    .controls-row { gap: 8px; flex-wrap: wrap; }
+    .filename-display { width: 100%; }
+
+    .drop-zone { padding: 20px 14px; }
+
+    .flag { font-size: 11px; padding: 2px 6px; }
+  }
+
+  @media (max-width: 400px) {
+    .sidebar { grid-template-columns: 1fr; }
+    .side-panel:nth-child(3),
+    .side-panel:nth-child(4) { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>UniNCoder</h1>
+  <span class="sub">Forensic Unicode Analyzer</span>
+  <span class="badge">Tama Hagane Seam Labs · ConsciousNode SoftWorks · v1.0.0</span>
+</header>
+
+<div class="shell">
+
+  <!-- INPUT ZONE -->
+  <div class="input-zone">
+    <div class="input-tabs">
+      <button class="tab-btn active" onclick="switchTab('text')">Paste Text</button>
+      <button class="tab-btn" onclick="switchTab('file')">Upload File</button>
+    </div>
+    <div class="input-panel active" id="tab-text">
+      <textarea id="textInput" placeholder="Paste text to analyze. Unicode anomalies will be detected and flagged.&#10;&#10;Supports plaintext and JSON content."></textarea>
+    </div>
+    <div class="input-panel" id="tab-file">
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <div class="drop-icon">⬆</div>
+        <p>Drop a <strong>.txt</strong>, <strong>.json</strong>, or <strong>.pdf</strong> file here, or <span>browse</span></p>
+        <p style="margin-top:6px;font-size:11px;">PDF: text layer extracted. Binary PDFs not supported in browser mode.</p>
+        <input type="file" id="fileInput" accept=".txt,.json,.pdf,.md,.csv" onchange="handleFile(this.files[0])">
+      </div>
+    </div>
+    <div class="controls-row">
+      <button class="btn btn-primary" onclick="analyze()">⌖ Analyze</button>
+      <button class="btn btn-secondary" onclick="clearAll()">✕ Clear</button>
+      <span class="filename-display" id="filenameDisplay"></span>
+    </div>
+  </div>
+
+  <!-- MAIN VIEW -->
+  <div class="main-view">
+
+    <!-- ANNOTATED VIEW -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">⬡ Annotated View</span>
+        <span class="panel-count" id="annotatedCount">—</span>
+      </div>
+      <div class="annotated-body empty" id="annotatedBody">
+        Run analysis to see annotated text with inline flags.
+      </div>
+    </div>
+
+    <!-- FINDINGS TABLE -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">⬡ Findings</span>
+        <span class="panel-count" id="findingsCount">—</span>
+      </div>
+      <div class="findings-scroll">
+        <div class="no-findings" id="noFindings">No findings yet.</div>
+        <table class="findings-table" id="findingsTable" style="display:none">
+          <thead>
+            <tr>
+              <th>Line:Col</th>
+              <th>Char</th>
+              <th>Codepoint</th>
+              <th>Type</th>
+              <th>Context</th>
+            </tr>
+          </thead>
+          <tbody id="findingsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DIFF VIEW -->
+    <div class="panel" id="diffPanel" style="display:none">
+      <div class="panel-header">
+        <span class="panel-title">⬡ Diff — Before / After Strip</span>
+        <span class="panel-count" id="diffCount"></span>
+      </div>
+      <div class="diff-body" id="diffBody"></div>
+    </div>
+
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- LEGEND -->
+    <div class="side-panel">
+      <div class="panel-header"><span class="panel-title">Legend</span></div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot zwsp"></div> Zero-width / invisible</div>
+        <div class="legend-item"><div class="legend-dot rtl"></div> Direction override</div>
+        <div class="legend-item"><div class="legend-dot homo"></div> Homoglyph substitute</div>
+        <div class="legend-item"><div class="legend-dot b64"></div> Encoded content</div>
+        <div class="legend-item"><div class="legend-dot ctrl"></div> Control character</div>
+        <div class="legend-item"><div class="legend-dot other"></div> Other anomaly</div>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="side-panel">
+      <div class="panel-header"><span class="panel-title">Summary</span></div>
+      <div class="summary-stats" id="summaryStats">
+        <div class="stat-row"><span>Total chars</span><span class="stat-val" id="statTotal">—</span></div>
+        <div class="stat-row"><span>Anomalies</span><span class="stat-val" id="statAnomalies">—</span></div>
+        <div class="stat-row"><span>Zero-width</span><span class="stat-val" id="statZW">—</span></div>
+        <div class="stat-row"><span>Direction</span><span class="stat-val" id="statDir">—</span></div>
+        <div class="stat-row"><span>Homoglyphs</span><span class="stat-val" id="statHomo">—</span></div>
+        <div class="stat-row"><span>Encoded</span><span class="stat-val" id="statB64">—</span></div>
+        <div class="stat-row"><span>Control</span><span class="stat-val" id="statCtrl">—</span></div>
+      </div>
+    </div>
+
+    <!-- STRIP CONTROLS -->
+    <div class="side-panel">
+      <div class="panel-header"><span class="panel-title">Strip</span></div>
+      <div class="strip-controls">
+        <div class="strip-label">Categories to strip</div>
+        <label class="check-row"><input type="checkbox" id="chkZW" checked> Zero-width / invisible</label>
+        <label class="check-row"><input type="checkbox" id="chkDir" checked> Direction overrides</label>
+        <label class="check-row"><input type="checkbox" id="chkHomo"> Homoglyphs → ASCII</label>
+        <label class="check-row"><input type="checkbox" id="chkCtrl" checked> Control characters</label>
+        <label class="check-row"><input type="checkbox" id="chkOther"> Other anomalies</label>
+        <div class="strip-btn-row">
+          <button class="btn btn-danger" onclick="stripSelected()">Strip Selected</button>
+          <button class="btn btn-secondary" onclick="copyClean()">Copy Clean Text</button>
+          <button class="btn btn-secondary" onclick="downloadClean()">Download .txt</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPORT -->
+    <div class="side-panel">
+      <div class="panel-header">
+        <span class="panel-title">Report</span>
+        <button class="btn btn-secondary" style="padding:3px 9px;font-size:10px;" onclick="copyReport()">Copy</button>
+      </div>
+      <div class="report-area" id="reportArea">Run analysis to generate report.</div>
+    </div>
+
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="status-bar">
+    <span id="statusMsg" class="status-ok">Ready.</span>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// UNICODE ANOMALY DEFINITIONS
+// ══════════════════════════════════════════════════════════════
+
+const ANOMALY_DEFS = [
+  // Zero-width / invisible
+  { cp: 0x200B, label: 'Zero-Width Space',            category: 'zwsp', cls: 'flag-zwsp', short: 'ZWS'  },
+  { cp: 0x200C, label: 'Zero-Width Non-Joiner',       category: 'zwsp', cls: 'flag-zwsp', short: 'ZWNJ' },
+  { cp: 0x200D, label: 'Zero-Width Joiner',           category: 'zwsp', cls: 'flag-zwsp', short: 'ZWJ'  },
+  { cp: 0xFEFF, label: 'BOM / Zero-Width No-Break Space', category: 'zwsp', cls: 'flag-zwsp', short: 'BOM' },
+  { cp: 0x2060, label: 'Word Joiner',                 category: 'zwsp', cls: 'flag-zwsp', short: 'WJ'   },
+  { cp: 0x2061, label: 'Function Application',        category: 'zwsp', cls: 'flag-zwsp', short: 'FA'   },
+  { cp: 0x2062, label: 'Invisible Times',             category: 'zwsp', cls: 'flag-zwsp', short: 'IT'   },
+  { cp: 0x2063, label: 'Invisible Separator',         category: 'zwsp', cls: 'flag-zwsp', short: 'IS'   },
+  { cp: 0x2064, label: 'Invisible Plus',              category: 'zwsp', cls: 'flag-zwsp', short: 'IP'   },
+  { cp: 0x00AD, label: 'Soft Hyphen',                 category: 'zwsp', cls: 'flag-zwsp', short: 'SHY'  },
+  { cp: 0x034F, label: 'Combining Grapheme Joiner',   category: 'zwsp', cls: 'flag-zwsp', short: 'CGJ'  },
+  { cp: 0x180E, label: 'Mongolian Vowel Separator',   category: 'zwsp', cls: 'flag-zwsp', short: 'MVS'  },
+
+  // Direction overrides
+  { cp: 0x202A, label: 'Left-to-Right Embedding',     category: 'dir',  cls: 'flag-rtl', short: 'LRE'  },
+  { cp: 0x202B, label: 'Right-to-Left Embedding',     category: 'dir',  cls: 'flag-rtl', short: 'RLE'  },
+  { cp: 0x202C, label: 'Pop Directional Formatting',  category: 'dir',  cls: 'flag-rtl', short: 'PDF'  },
+  { cp: 0x202D, label: 'Left-to-Right Override',      category: 'dir',  cls: 'flag-rtl', short: 'LRO'  },
+  { cp: 0x202E, label: 'Right-to-Left Override',      category: 'dir',  cls: 'flag-rtl', short: 'RLO'  },
+  { cp: 0x2066, label: 'Left-to-Right Isolate',       category: 'dir',  cls: 'flag-rtl', short: 'LRI'  },
+  { cp: 0x2067, label: 'Right-to-Left Isolate',       category: 'dir',  cls: 'flag-rtl', short: 'RLI'  },
+  { cp: 0x2068, label: 'First Strong Isolate',        category: 'dir',  cls: 'flag-rtl', short: 'FSI'  },
+  { cp: 0x2069, label: 'Pop Directional Isolate',     category: 'dir',  cls: 'flag-rtl', short: 'PDI'  },
+  { cp: 0x200E, label: 'Left-to-Right Mark',          category: 'dir',  cls: 'flag-rtl', short: 'LRM'  },
+  { cp: 0x200F, label: 'Right-to-Left Mark',          category: 'dir',  cls: 'flag-rtl', short: 'RLM'  },
+];
+
+// Control characters (0x00–0x1F excluding \t, \n, \r; and 0x7F, 0x80–0x9F)
+function isControl(cp) {
+  if (cp === 0x09 || cp === 0x0A || cp === 0x0D) return false; // tab, LF, CR ok
+  if (cp >= 0x00 && cp <= 0x1F) return true;
+  if (cp === 0x7F) return true;
+  if (cp >= 0x80 && cp <= 0x9F) return true;
+  return false;
+}
+
+// Homoglyph map: confusable non-ASCII → ASCII equivalent
+const HOMOGLYPHS = {
+  0x0430: 'a', 0x0435: 'e', 0x043E: 'o', 0x0440: 'p', 0x0441: 'c', 0x0445: 'x',
+  0x0456: 'i', 0x0458: 'j', 0x04CF: 'l', 0x0410: 'A', 0x0412: 'B', 0x0415: 'E',
+  0x041A: 'K', 0x041C: 'M', 0x041D: 'H', 0x041E: 'O', 0x0420: 'P', 0x0421: 'C',
+  0x0422: 'T', 0x0425: 'X', 0x0405: 'S', 0x0406: 'I', 0x0408: 'J',
+  // Greek
+  0x03B1: 'a', 0x03B2: 'B', 0x03B5: 'e', 0x03BF: 'o', 0x03C1: 'p', 0x03C5: 'u',
+  0x0391: 'A', 0x0392: 'B', 0x0395: 'E', 0x0396: 'Z', 0x0397: 'H', 0x0399: 'I',
+  0x039A: 'K', 0x039C: 'M', 0x039D: 'N', 0x039F: 'O', 0x03A1: 'P', 0x03A4: 'T',
+  0x03A5: 'Y', 0x03A7: 'X',
+  // Fullwidth latin
+  ...Object.fromEntries(Array.from({length:26}, (_,i) => [0xFF41+i, String.fromCharCode(0x61+i)])),
+  ...Object.fromEntries(Array.from({length:26}, (_,i) => [0xFF21+i, String.fromCharCode(0x41+i)])),
+  // Mathematical bold/italic/script variants (common injection vector)
+  0x1D41A: 'a', 0x1D41B: 'b', 0x1D41C: 'c',
+  // Lookalike punctuation
+  0x2018: "'", 0x2019: "'", 0x201C: '"', 0x201D: '"',
+  0x2010: '-', 0x2011: '-', 0x2012: '-', 0x2013: '-', 0x2014: '-',
+  0x00B7: '.', 0x2024: '.', 0x22C5: '.', 0x0387: ';', 0x037E: ';',
+};
+
+// Known ANOMALY_DEFS codepoints for fast lookup
+const KNOWN_CPS = new Map(ANOMALY_DEFS.map(d => [d.cp, d]));
+
+// ══════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════
+
+let currentText = '';
+let findings = [];
+let cleanText = '';
+let activeTab = 'text';
+let loadedFilename = '';
+
+// ══════════════════════════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════════════════════════
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', (i===0 && tab==='text') || (i===1 && tab==='file'));
+  });
+  document.getElementById('tab-text').classList.toggle('active', tab==='text');
+  document.getElementById('tab-file').classList.toggle('active', tab==='file');
+}
+
+// ══════════════════════════════════════════════════════════════
+// FILE HANDLING
+// ══════════════════════════════════════════════════════════════
+
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(file) {
+  if (!file) return;
+  loadedFilename = file.name;
+  document.getElementById('filenameDisplay').textContent = file.name;
+  setStatus(`Loading ${file.name}…`, '');
+
+  if (file.name.endsWith('.pdf')) {
+    // Use FileReader + basic text extraction note
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      // Extract readable text from PDF bytes (basic: grab printable ASCII runs)
+      const bytes = new Uint8Array(e.target.result);
+      let text = '';
+      // Try to decode as UTF-8 first for text-layer PDFs
+      try {
+        const full = new TextDecoder('utf-8', {fatal: false}).decode(bytes);
+        // Extract text between BT/ET blocks and stream content
+        const chunks = [];
+        // grab parenthetical strings: (some text)
+        const re = /\(([^)\\]|\\.)*\)/g;
+        let m;
+        while ((m = re.exec(full)) !== null) {
+          let s = m[0].slice(1,-1)
+            .replace(/\\n/g,'\n').replace(/\\r/g,'\r').replace(/\\t/g,'\t')
+            .replace(/\\\\/g,'\\').replace(/\\\(/g,'(').replace(/\\\)/g,')');
+          if (s.trim().length > 0) chunks.push(s);
+        }
+        text = chunks.join(' ');
+        if (text.length < 20) throw new Error('sparse');
+      } catch {
+        // Fallback: raw printable chars
+        for (let i = 0; i < bytes.length; i++) {
+          const b = bytes[i];
+          if ((b >= 32 && b < 127) || b === 10 || b === 13) text += String.fromCharCode(b);
+        }
+      }
+      currentText = text;
+      document.getElementById('textInput').value = text;
+      setStatus(`Loaded PDF: ${file.name} (${text.length} chars extracted)`, 'ok');
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    const reader = new FileReader();
+    reader.onload = e => {
+      currentText = e.target.result;
+      document.getElementById('textInput').value = currentText;
+      setStatus(`Loaded: ${file.name} (${currentText.length} chars)`, 'ok');
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// BASE64 DETECTION
+// ══════════════════════════════════════════════════════════════
+
+function detectBase64Regions(text) {
+  const regions = [];
+  // Look for runs of base64 chars ≥ 20 chars long that decode cleanly
+  const re = /[A-Za-z0-9+/]{20,}={0,2}/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    try {
+      const decoded = atob(m[0]);
+      // Check if decoded has meaningful content (printable or binary signature)
+      const printable = decoded.split('').filter(c => c.charCodeAt(0) >= 32 && c.charCodeAt(0) < 127).length;
+      if (printable / decoded.length > 0.7) {
+        regions.push({ start: m.index, end: m.index + m[0].length, decoded: decoded.slice(0,80) });
+      }
+    } catch {}
+  }
+  return regions;
+}
+
+// ══════════════════════════════════════════════════════════════
+// CORE ANALYSIS
+// ══════════════════════════════════════════════════════════════
+
+function analyze() {
+  const text = document.getElementById('textInput').value;
+  if (!text.trim()) { setStatus('Nothing to analyze.', 'warn'); return; }
+  currentText = text;
+  findings = [];
+  cleanText = text;
+
+  setStatus('Analyzing…', '');
+
+  const lines = text.split('\n');
+  const b64regions = detectBase64Regions(text);
+
+  // Track absolute position
+  let absPos = 0;
+
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    // Iterate codepoints (handles surrogate pairs)
+    const codepoints = [...line]; // spread handles emoji/supplementary
+    let colPos = 0;
+    for (let ci = 0; ci < codepoints.length; ci++) {
+      const char = codepoints[ci];
+      const cp = char.codePointAt(0);
+      const absIdx = absPos + ci;
+
+      let finding = null;
+
+      // Known anomaly?
+      if (KNOWN_CPS.has(cp)) {
+        const def = KNOWN_CPS.get(cp);
+        finding = {
+          line: li + 1, col: ci + 1, absPos: absIdx,
+          char, cp, label: def.label, category: def.category,
+          cls: def.cls, short: def.short,
+          context: getContext(text, absIdx)
+        };
+      }
+      // Control character?
+      else if (isControl(cp)) {
+        finding = {
+          line: li + 1, col: ci + 1, absPos: absIdx,
+          char, cp,
+          label: `Control Character (U+${cp.toString(16).toUpperCase().padStart(4,'0')})`,
+          category: 'ctrl', cls: 'flag-ctrl', short: 'CTRL',
+          context: getContext(text, absIdx)
+        };
+      }
+      // Homoglyph?
+      else if (HOMOGLYPHS[cp] !== undefined) {
+        finding = {
+          line: li + 1, col: ci + 1, absPos: absIdx,
+          char, cp,
+          label: `Homoglyph — looks like '${HOMOGLYPHS[cp]}' (${getScriptName(cp)})`,
+          category: 'homo', cls: 'flag-homo', short: '≈'+HOMOGLYPHS[cp],
+          homoAscii: HOMOGLYPHS[cp],
+          context: getContext(text, absIdx)
+        };
+      }
+
+      if (finding) findings.push(finding);
+      colPos++;
+    }
+    absPos += line.length + 1; // +1 for \n
+  }
+
+  // Base64 regions as findings (mark the first char)
+  for (const r of b64regions) {
+    // Find line/col for start
+    const before = text.slice(0, r.start);
+    const li = (before.match(/\n/g) || []).length;
+    const lastNL = before.lastIndexOf('\n');
+    const col = r.start - (lastNL + 1) + 1;
+    findings.push({
+      line: li + 1, col, absPos: r.start,
+      char: text.slice(r.start, r.start + 6) + '…',
+      cp: null,
+      label: `Base64-encoded content (decoded: "${r.decoded.slice(0,40)}${r.decoded.length>40?'…':''}")`,
+      category: 'b64', cls: 'flag-b64', short: 'B64',
+      b64end: r.end,
+      context: getContext(text, r.start)
+    });
+  }
+
+  // Sort by position
+  findings.sort((a, b) => a.absPos - b.absPos);
+
+  renderAnnotated(text);
+  renderFindings();
+  renderStats(text);
+  renderReport(text);
+  document.getElementById('diffPanel').style.display = 'none';
+  setStatus(`Analysis complete — ${findings.length} anomal${findings.length===1?'y':'ies'} found in ${text.length} characters.`,
+    findings.length > 0 ? 'warn' : 'ok');
+}
+
+function getContext(text, pos) {
+  const start = Math.max(0, pos - 12);
+  const end = Math.min(text.length, pos + 12);
+  return text.slice(start, end).replace(/[\n\r]/g, '↵').replace(/\t/g, '→');
+}
+
+function getScriptName(cp) {
+  if (cp >= 0x0400 && cp <= 0x04FF) return 'Cyrillic';
+  if (cp >= 0x0370 && cp <= 0x03FF) return 'Greek';
+  if (cp >= 0xFF00 && cp <= 0xFFEF) return 'Fullwidth';
+  return 'Non-ASCII';
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER: ANNOTATED VIEW
+// ══════════════════════════════════════════════════════════════
+
+function renderAnnotated(text) {
+  const container = document.getElementById('annotatedBody');
+  container.classList.remove('empty');
+
+  if (findings.length === 0) {
+    container.textContent = text.length > 2000 ? text.slice(0,2000) + '\n…[truncated for display]' : text;
+    document.getElementById('annotatedCount').textContent = 'No anomalies';
+    return;
+  }
+
+  document.getElementById('annotatedCount').textContent = `${findings.length} flagged`;
+
+  // Build annotated HTML
+  let html = '';
+  let cursor = 0;
+  const sorted = [...findings].filter(f => f.cp !== null || f.category === 'b64'); // char-level
+
+  for (const f of sorted) {
+    if (f.absPos > cursor) {
+      const slice = text.slice(cursor, f.absPos);
+      html += escHtml(slice.length > 500 ? slice.slice(0,500)+'…' : slice);
+    }
+    const tipText = `${f.label}\nU+${f.cp ? f.cp.toString(16).toUpperCase().padStart(4,'0') : '?'}\nLine ${f.line}, Col ${f.col}\n${f.context}`;
+    const displayChar = f.cp ? (f.cp < 0x20 || f.cp === 0x7F ? '␣' : f.char) : f.char;
+    html += `<span class="flag ${f.cls}" title="${escAttr(tipText)}">${escHtml(displayChar)} <span class="codepoint">${f.short}</span></span>`;
+    cursor = f.absPos + (f.cp ? f.char.length : (f.b64end ? f.b64end - f.absPos : 1));
+  }
+  if (cursor < text.length) {
+    const tail = text.slice(cursor);
+    html += escHtml(tail.length > 500 ? tail.slice(0,500)+'…' : tail);
+  }
+
+  container.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER: FINDINGS TABLE
+// ══════════════════════════════════════════════════════════════
+
+function renderFindings() {
+  const tbody = document.getElementById('findingsBody');
+  const table = document.getElementById('findingsTable');
+  const noF = document.getElementById('noFindings');
+  const count = document.getElementById('findingsCount');
+
+  if (findings.length === 0) {
+    table.style.display = 'none';
+    noF.style.display = '';
+    noF.textContent = '✓ No anomalies detected.';
+    count.textContent = '0 findings';
+    return;
+  }
+
+  noF.style.display = 'none';
+  table.style.display = '';
+  count.textContent = `${findings.length} finding${findings.length>1?'s':''}`;
+
+  tbody.innerHTML = findings.map(f => `
+    <tr>
+      <td class="col-pos">${f.line}:${f.col}</td>
+      <td class="col-char"><span class="flag ${f.cls}">${escHtml(f.cp && (f.cp < 0x20 || f.cp === 0x7F) ? '␣' : f.char)} <span class="codepoint">${f.short}</span></span></td>
+      <td class="col-cp">${f.cp ? 'U+'+f.cp.toString(16).toUpperCase().padStart(4,'0') : '—'}</td>
+      <td>${escHtml(f.label)}</td>
+      <td class="col-ctx" title="${escAttr(f.context)}">${escHtml(f.context)}</td>
+    </tr>
+  `).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER: STATS
+// ══════════════════════════════════════════════════════════════
+
+function renderStats(text) {
+  const counts = { zwsp:0, dir:0, homo:0, b64:0, ctrl:0, other:0 };
+  for (const f of findings) counts[f.category] = (counts[f.category]||0) + 1;
+
+  document.getElementById('statTotal').textContent = text.length.toLocaleString();
+  const anom = findings.length;
+  const anomEl = document.getElementById('statAnomalies');
+  anomEl.textContent = anom;
+  anomEl.className = 'stat-val' + (anom > 0 ? ' alert' : '');
+  document.getElementById('statZW').textContent = counts.zwsp || '0';
+  document.getElementById('statDir').textContent = counts.dir || '0';
+  document.getElementById('statHomo').textContent = counts.homo || '0';
+  document.getElementById('statB64').textContent = counts.b64 || '0';
+  document.getElementById('statCtrl').textContent = counts.ctrl || '0';
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER: REPORT
+// ══════════════════════════════════════════════════════════════
+
+function renderReport(text) {
+  const now = new Date().toISOString();
+  const counts = {};
+  for (const f of findings) counts[f.category] = (counts[f.category]||0) + 1;
+
+  const lines = [
+    `UniNCoder — Forensic Unicode Analysis Report`,
+    `Tama Hagane Seam Labs · ConsciousNode SoftWorks`,
+    `Generated: ${now}`,
+    loadedFilename ? `Source: ${loadedFilename}` : `Source: pasted text`,
+    ``,
+    `SUMMARY`,
+    `  Total characters: ${text.length}`,
+    `  Total anomalies:  ${findings.length}`,
+    ``,
+    `BY CATEGORY`,
+    `  Zero-width / invisible: ${counts.zwsp||0}`,
+    `  Direction overrides:    ${counts.dir||0}`,
+    `  Homoglyphs:             ${counts.homo||0}`,
+    `  Encoded content (B64):  ${counts.b64||0}`,
+    `  Control characters:     ${counts.ctrl||0}`,
+    `  Other:                  ${counts.other||0}`,
+    ``,
+    `FINDINGS`,
+  ];
+
+  for (const f of findings) {
+    lines.push(`  [${f.line}:${f.col}] ${f.label}`);
+    if (f.cp) lines.push(`         U+${f.cp.toString(16).toUpperCase().padStart(4,'0')} — context: ${f.context}`);
+  }
+
+  document.getElementById('reportArea').textContent = lines.join('\n');
+}
+
+// ══════════════════════════════════════════════════════════════
+// STRIP
+// ══════════════════════════════════════════════════════════════
+
+function stripSelected() {
+  if (!currentText) { setStatus('No text to strip.', 'warn'); return; }
+  const stripCats = new Set();
+  if (document.getElementById('chkZW').checked)   stripCats.add('zwsp');
+  if (document.getElementById('chkDir').checked)  stripCats.add('dir');
+  if (document.getElementById('chkHomo').checked) stripCats.add('homo');
+  if (document.getElementById('chkCtrl').checked) stripCats.add('ctrl');
+  if (document.getElementById('chkOther').checked) stripCats.add('other');
+
+  const toStrip = findings.filter(f => stripCats.has(f.category));
+  if (toStrip.length === 0) { setStatus('No matching findings to strip.', 'warn'); return; }
+
+  let result = currentText;
+  // Build strip set by absPos, process in reverse to preserve positions
+  const stripSet = new Map();
+  for (const f of toStrip) {
+    if (f.category === 'homo' && f.homoAscii) {
+      stripSet.set(f.absPos, { replace: f.homoAscii, len: f.char.length });
+    } else if (f.category === 'b64') {
+      // Don't auto-strip B64 runs — just flag them
+    } else {
+      stripSet.set(f.absPos, { replace: '', len: f.char.length });
+    }
+  }
+
+  // Apply replacements in reverse order
+  const positions = [...stripSet.keys()].sort((a,b) => b - a);
+  for (const pos of positions) {
+    const { replace, len } = stripSet.get(pos);
+    result = result.slice(0, pos) + replace + result.slice(pos + len);
+  }
+
+  cleanText = result;
+  renderDiff(currentText, cleanText, toStrip.length);
+  setStatus(`Stripped ${toStrip.length} character${toStrip.length!==1?'s':''}. See diff below.`, 'ok');
+}
+
+function renderDiff(original, clean, count) {
+  const panel = document.getElementById('diffPanel');
+  const body = document.getElementById('diffBody');
+  const cnt = document.getElementById('diffCount');
+  panel.style.display = '';
+  cnt.textContent = `${count} removed`;
+
+  // Simple diff: show lines with changes highlighted
+  const origLines = original.split('\n');
+  const cleanLines = clean.split('\n');
+  let html = '';
+  const maxLines = Math.max(origLines.length, cleanLines.length);
+  for (let i = 0; i < maxLines; i++) {
+    const ol = origLines[i] || '';
+    const cl = cleanLines[i] || '';
+    if (ol === cl) {
+      html += escHtml(ol) + '\n';
+    } else {
+      html += `<span class="diff-del">${escHtml(ol)}</span>\n<span class="diff-add">${escHtml(cl)}</span>\n`;
+    }
+  }
+  body.innerHTML = html;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ══════════════════════════════════════════════════════════════
+// COPY / DOWNLOAD
+// ══════════════════════════════════════════════════════════════
+
+function copyClean() {
+  const text = cleanText || currentText;
+  if (!text) { setStatus('Nothing to copy.', 'warn'); return; }
+  navigator.clipboard.writeText(text).then(() => setStatus('Clean text copied to clipboard.', 'ok'));
+}
+
+function downloadClean() {
+  const text = cleanText || currentText;
+  if (!text) { setStatus('Nothing to download.', 'warn'); return; }
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = loadedFilename ? loadedFilename.replace(/\.[^.]+$/, '') + '_clean.txt' : 'unincode_clean.txt';
+  a.click();
+  setStatus('Downloaded clean file.', 'ok');
+}
+
+function copyReport() {
+  const text = document.getElementById('reportArea').textContent;
+  navigator.clipboard.writeText(text).then(() => setStatus('Report copied to clipboard.', 'ok'));
+}
+
+// ══════════════════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════════════════
+
+function clearAll() {
+  document.getElementById('textInput').value = '';
+  document.getElementById('annotatedBody').textContent = 'Run analysis to see annotated text with inline flags.';
+  document.getElementById('annotatedBody').classList.add('empty');
+  document.getElementById('annotatedCount').textContent = '—';
+  document.getElementById('findingsBody').innerHTML = '';
+  document.getElementById('findingsTable').style.display = 'none';
+  document.getElementById('noFindings').style.display = '';
+  document.getElementById('noFindings').textContent = 'No findings yet.';
+  document.getElementById('findingsCount').textContent = '—';
+  document.getElementById('diffPanel').style.display = 'none';
+  document.getElementById('reportArea').textContent = 'Run analysis to generate report.';
+  document.getElementById('filenameDisplay').textContent = '';
+  ['statTotal','statAnomalies','statZW','statDir','statHomo','statB64','statCtrl']
+    .forEach(id => { document.getElementById(id).textContent = '—'; });
+  findings = []; currentText = ''; cleanText = ''; loadedFilename = '';
+  setStatus('Ready.', 'ok');
+}
+
+function setStatus(msg, level) {
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.className = level === 'ok' ? 'status-ok' : level === 'warn' ? 'status-warn' : level === 'err' ? 'status-err' : '';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) {
+  return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Keyboard shortcut: Ctrl+Enter to analyze
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') analyze();
+});
+</script>
+</body>
+</html>
